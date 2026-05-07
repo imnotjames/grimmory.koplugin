@@ -1,0 +1,1 @@
+# grimmory.koplugin
