@@ -42,9 +42,13 @@ function Grimmory:addToMainMenu(menu_items)
         sub_item_table = {
             {
                 text = _("Sync Now"),
+                enabled_func = function()
+                    return self.settings:getBaseUri() ~= ""
+                end,
                 callback = function()
                     self:synchronize(true)
                 end,
+                separator = true,
             },
             {
                 text = _("Connection Settings"),
