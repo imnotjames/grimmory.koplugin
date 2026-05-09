@@ -121,6 +121,12 @@ function GrimmorySynchronize:synchronizeShelves(connector, since, callback)
                 if shelfIdToName[connectorId] ~= collectionName then
                     -- This collection has been renamed!
                     ReadCollection:renameCollection(collectionName, shelfIdToName[connectorId])
+
+                    callback({
+                        state = "shelf-rename",
+                        shelfId = connectorId,
+                        shelfName = shelfIdToName[connectorId],
+                    })
                 end
             else
                 -- This was a shelf but the shelf is gone in the connector
@@ -130,6 +136,12 @@ function GrimmorySynchronize:synchronizeShelves(connector, since, callback)
                 -- Set the connector ID to nil so the block below will pick
                 -- it up if it's a shelf being deleted and recreated
                 connectorId = nil
+
+                callback({
+                    state = "shelf-disconnect",
+                    shelfId = connectorId,
+                    shelfName = collectionName,
+                })
             end
         end
 
@@ -141,6 +153,12 @@ function GrimmorySynchronize:synchronizeShelves(connector, since, callback)
             logger:info("Found an existing collection that can be attached to a shelf:", collectionName, connectorId)
 
             ReadCollection.coll_settings[collectionName].connectorId = connectorId
+
+            callback({
+                state = "shelf-connect",
+                shelfId = connectorId,
+                shelfName = collectionName,
+            })
         end
     end
 
@@ -151,6 +169,12 @@ function GrimmorySynchronize:synchronizeShelves(connector, since, callback)
 
             ReadCollection:addCollection(shelfName)
             ReadCollection.coll_settings[shelfName].connectorId = connectorId
+
+            callback({
+                state = "shelf-add",
+                shelfId = connectorId,
+                shelfName = shelfIdToName[connectorId],
+            })
         end
     end
 
