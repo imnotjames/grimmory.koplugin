@@ -55,7 +55,13 @@ function Grimmory:addToMainMenu(menu_items)
                 callback = function()
                     self.settings:showConnectionSettings()
                 end,
-            }
+            },
+            {
+                text = _("Session Threshold"),
+                callback = function()
+                    self.settings:showSessionThresholdSettings()
+                end,
+            },
         }
     }
 end
@@ -109,6 +115,11 @@ function Grimmory:onGrimmorySync()
 end
 
 function Grimmory:onGrimmorySettingsChanged()
+    GrimmorySynchronize:setThresholds(
+        self.settings:getSessionThresholdSeconds(),
+        self.settings:getSessionThresholdPages()
+    )
+
     GrimmoryConnector:setCredentials(
         self.settings:getBaseUri(),
         self.settings:getUsername(),

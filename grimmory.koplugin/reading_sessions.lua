@@ -75,16 +75,19 @@ function ReadingSessions:getSessions(since)
         -- We can make the assumption that these are in
         -- order by book ID and start time to simplify.
         local collapsedSession = false
+
         if #sessions > 0 then
             local lastBookId = sessions[#sessions].bookId
             local lastEndTime = sessions[#sessions].endTime
             local lastProgress = sessions[#sessions].endProgress
+            local lastPage = sessions[#sessions].endPage
 
             if stat.bookId == lastBookId and math.abs(stat.startTime - lastEndTime) < SESSION_COLLAPSE_THRESHOLD then
                 logger:dbg("Collapsed session for book", stat.bookId)
                 collapsedSession = true
                 sessions[#sessions].endTime = math.max(stat.endTime, lastEndTime)
                 sessions[#sessions].endProgress = math.max(progress, lastProgress)
+                sessions[#sessions].endPage = math.max(stat.page, lastPage)
             end
         end
 
@@ -101,12 +104,19 @@ function ReadingSessions:getSessions(since)
                     endTime = stat.endTime,
                     startProgress = progress,
                     endProgress = progress,
+                    startPage = stat.page,
+                    endPage = stat.page,
                 }
             )
         end
     end
 
-    -- TODO: Sort by start time?
+    table.sort(
+        sessions,
+        function (a, b)
+            return a.startTime - b.startTime
+        end
+    )
 
     return sessions
 end

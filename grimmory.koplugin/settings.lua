@@ -27,6 +27,10 @@ local DEFAULTS = {
     baseUri = "",
     username = "",
     password = "",
+    sessionThresholdSeconds = 30,
+    sessionThresholdPages = 0,
+    syncOnFinish = true,
+    syncOnSuspend = true,
 }
 
 local function openSettingsHandle()
@@ -102,56 +106,100 @@ function GrimmorySettings:showConnectionSettings()
                 text = _("Cancel"),
                 id = "close",
                 callback = function()
-                UIManager:close(self.settingsDialog)
+                    UIManager:close(self.settingsDialog)
                 end,
             },
             {
                 text = _("Test"),
                 callback = function()
-                local fields = self.settingsDialog:getFields()
+                    local fields = self.settingsDialog:getFields()
 
-                GrimmoryConnector:setCredentials(
-                    fields[1],
-                    fields[2],
-                    fields[3]
-                )
+                    GrimmoryConnector:setCredentials(
+                        fields[1],
+                        fields[2],
+                        fields[3]
+                    )
 
-                ok, version = GrimmoryConnector:getVersion()
+                    local ok, version = GrimmoryConnector:getVersion()
 
-                -- Reset the credentials after the test
-                GrimmoryConnector:setCredentials(
-                    self:getBaseUri(),
-                    self:getUsername(),
-                    self:getPassword()
-                )
+                    -- Reset the credentials after the test
+                    GrimmoryConnector:setCredentials(
+                        self:getBaseUri(),
+                        self:getUsername(),
+                        self:getPassword()
+                    )
 
-                if ok then
-                    UIManager:show(InfoMessage:new({
-                        text = T(_("Connection successful\nGrimmory (%1)"), tostring(version)),
-                        timeout = 2,
-                    }))
-                else
-                    UIManager:show(InfoMessage:new({
-                        text = T(_("Unable to connect to Grimmory\nError: %1"), tostring(version)),
-                        timeout = 2,
-                    }))
-                end
+                    if ok then
+                        UIManager:show(InfoMessage:new({
+                            text = T(_("Connection successful\nGrimmory (%1)"), tostring(version)),
+                            timeout = 2,
+                        }))
+                    else
+                        UIManager:show(InfoMessage:new({
+                            text = T(_("Unable to connect to Grimmory\nError: %1"), tostring(version)),
+                            timeout = 2,
+                        }))
+                    end
 
                 end,
             },
             {
                 text = _("Apply"),
                 callback = function()
-                local fields = self.settingsDialog:getFields()
+                    local fields = self.settingsDialog:getFields()
 
-                self:setBaseUri(fields[1])
-                self:setUsername(fields[2])
-                self:setPassword(fields[3])
+                    self:setBaseUri(fields[1])
+                    self:setUsername(fields[2])
+                    self:setPassword(fields[3])
 
-                UIManager:sendEvent(Event:new("GrimmorySettingsChanged"))
+                    UIManager:sendEvent(Event:new("GrimmorySettingsChanged"))
 
-                UIManager:close(self.settingsDialog)
-                UIManager:show(InfoMessage:new({ text = _("Grimmory connection saved."), timeout = 2 }))
+                    UIManager:close(self.settingsDialog)
+                end,
+            },
+            },
+        },
+    })
+
+    UIManager:show(self.settingsDialog)
+    self.settingsDialog:onShowKeyboard()
+end
+
+function GrimmorySettings:showSessionThresholdSettings()
+    self.settingsDialog = MultiInputDialog:new({
+        title = _("Session Thresholds"),
+        fields = {
+            {
+                text = self:getSessionThresholdSeconds(),
+                description = _("Seconds to create a session"),
+                input_type = "number"
+            },
+            {
+                text = self:getSessionThresholdPages(),
+                description = _("Pages to create a session"),
+                input_type = "number"
+            },
+        },
+        buttons = {
+            {
+            {
+                text = _("Cancel"),
+                id = "close",
+                callback = function()
+                    UIManager:close(self.settingsDialog)
+                end,
+            },
+            {
+                text = _("Apply"),
+                callback = function()
+                    local fields = self.settingsDialog:getFields()
+
+                    self:setSessionThresholdSeconds(math.max(0, fields[1]))
+                    self:setSessionThresholdPages(math.max(0, fields[2]))
+
+                    UIManager:sendEvent(Event:new("GrimmorySettingsChanged"))
+
+                    UIManager:close(self.settingsDialog)
                 end,
             },
             },
@@ -185,6 +233,48 @@ end
 
 function GrimmorySettings:setPassword(password)
     self:update({ password = password })
+end
+
+function GrimmorySettings:getSessionThresholdSeconds()
+    return self.data.sessionThresholdSeconds or DEFAULTS.sessionThresholdSeconds
+end
+
+function GrimmorySettings:setSessionThresholdSeconds(sessionThresholdSeconds)
+    self:update({ sessionThresholdSeconds = sessionThresholdSeconds })
+end
+
+function GrimmorySettings:getSessionThresholdPages()
+    return self.data.sessionThresholdPages or DEFAULTS.sessionThresholdPages
+end
+
+function GrimmorySettings:setSessionThresholdPages(sessionThresholdPages)
+    self:update({ sessionThresholdPages = sessionThresholdPages })
+end
+
+function GrimmorySettings:toggleSyncOnFinish()
+    logger:info("UPDATE", not self:getSyncOnFinish())
+    self:update({ syncOnFinish = not self:getSyncOnFinish() })
+    logger:info("UPDATE", not self:getSyncOnFinish())
+end
+
+function GrimmorySettings:getSyncOnFinish()
+    if self.data.syncOnFinish == nil then
+        return DEFAULTS.syncOnFinish
+    end
+
+    return self.data.syncOnFinish
+end
+
+function GrimmorySettings:toggleSyncOnSuspend()
+    self:update({ syncOnSuspend = not self:getSyncOnSuspend() })
+end
+
+function GrimmorySettings:getSyncOnSuspend()
+    if self.data.syncOnSuspend == nil then
+        return DEFAULTS.syncOnSuspend
+    end
+
+    return self.data.syncOnSuspend
 end
 
 function GrimmorySettings:getSynchronizedUntil()
