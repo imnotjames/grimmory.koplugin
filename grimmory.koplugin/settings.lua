@@ -29,8 +29,10 @@ local DEFAULTS = {
     password = "",
     sessionThresholdSeconds = 30,
     sessionThresholdPages = 0,
-    syncOnFinish = true,
+    syncOnCloseDocument = true,
     syncOnSuspend = true,
+    syncOnPowerOff = true,
+    syncEnableWifi = false,
 }
 
 local function openSettingsHandle()
@@ -251,18 +253,16 @@ function GrimmorySettings:setSessionThresholdPages(sessionThresholdPages)
     self:update({ sessionThresholdPages = sessionThresholdPages })
 end
 
-function GrimmorySettings:toggleSyncOnFinish()
-    logger:info("UPDATE", not self:getSyncOnFinish())
-    self:update({ syncOnFinish = not self:getSyncOnFinish() })
-    logger:info("UPDATE", not self:getSyncOnFinish())
+function GrimmorySettings:toggleSyncOnCloseDocument()
+    self:update({ syncOnCloseDocument = not self:getSyncOnCloseDocument() })
 end
 
-function GrimmorySettings:getSyncOnFinish()
-    if self.data.syncOnFinish == nil then
-        return DEFAULTS.syncOnFinish
+function GrimmorySettings:getSyncOnCloseDocument()
+    if self.data.syncOnCloseDocument == nil then
+        return DEFAULTS.syncOnCloseDocument
     end
 
-    return self.data.syncOnFinish
+    return self.data.syncOnCloseDocument
 end
 
 function GrimmorySettings:toggleSyncOnSuspend()
@@ -275,6 +275,30 @@ function GrimmorySettings:getSyncOnSuspend()
     end
 
     return self.data.syncOnSuspend
+end
+
+function GrimmorySettings:toggleSyncOnPowerOff()
+    self:update({ syncOnPowerOff = not self:getSyncOnPowerOff() })
+end
+
+function GrimmorySettings:getSyncOnPowerOff()
+    if self.data.syncOnPowerOff == nil then
+        return DEFAULTS.syncOnPowerOff
+    end
+
+    return self.data.syncOnPowerOff
+end
+
+function GrimmorySettings:toggleSyncEnableWifi()
+    self:update({ syncEnableWifi = not self:getSyncEnableWifi() })
+end
+
+function GrimmorySettings:getSyncEnableWifi()
+    if self.data.syncEnableWifi == nil then
+        return DEFAULTS.syncEnableWifi
+    end
+
+    return self.data.syncEnableWifi
 end
 
 function GrimmorySettings:getSynchronizedUntil()

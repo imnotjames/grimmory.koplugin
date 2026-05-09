@@ -5,6 +5,7 @@ local Dispatcher = require("dispatcher")
 local Event = require("ui/event")
 local InfoMessage = require("ui/widget/infomessage")
 local NetworkManager = require("ui/network/manager")
+local Socket = require("socket")
 local UIManager = require("ui/uimanager")
 local WidgetContainer = require("ui/widget/container/widgetcontainer")
 
@@ -43,10 +44,13 @@ function Grimmory:addToMainMenu(menu_items)
             {
                 text = _("Sync Now"),
                 enabled_func = function()
-                    return self.settings:getBaseUri() ~= ""
+                    return self:isReadyToSync()
                 end,
                 callback = function()
-                    self:synchronize(true)
+                    -- Do not block the UI thread
+                    UIManager:scheduleIn(0.1, function()
+                        self:synchronize(true)
+                    end)
                 end,
                 separator = true,
             },
@@ -55,6 +59,51 @@ function Grimmory:addToMainMenu(menu_items)
                 callback = function()
                     self.settings:showConnectionSettings()
                 end,
+            },
+            {
+                text = _("Sync Configuration"),
+                sub_item_table = {
+                    {
+                        text = _("On Close Document"),
+                        checked_func = function()
+                            return self.settings:getSyncOnCloseDocument()
+                        end,
+                        callback = function()
+                            self.settings:toggleSyncOnCloseDocument()
+                        end,
+                        keep_menu_open = true,
+                    },
+                    {
+                        text = _("On Suspend"),
+                        checked_func = function()
+                            return self.settings:getSyncOnSuspend()
+                        end,
+                        callback = function()
+                            self.settings:toggleSyncOnSuspend()
+                        end,
+                        keep_menu_open = true,
+                    },
+                    {
+                        text = _("On Power Off"),
+                        checked_func = function()
+                            return self.settings:getSyncOnPowerOff()
+                        end,
+                        callback = function()
+                            self.settings:toggleSyncOnPowerOff()
+                        end,
+                        keep_menu_open = true,
+                        separator = true,
+                    },
+                    {
+                        text = _("Enable WiFi"),
+                        checked_func = function()
+                            return self.settings:getSyncEnableWifi()
+                        end,
+                        callback = function()
+                            self.settings:toggleSyncEnableWifi()
+                        end,
+                    },
+                },
             },
             {
                 text = _("Session Threshold"),
@@ -88,18 +137,18 @@ end
 
 function Grimmory:onSuspend()
     logger:dbg("Device is suspending")
-end
 
-function Grimmory:onResume()
-    logger:dbg("Device is suspending")
+    if self.settings:getSyncOnSuspend() then
+       self:synchronizeOnEvent()
+    end
 end
 
 function Grimmory:onPowerOff()
     logger:dbg("Device is powering off")
-end
 
-function Grimmory:onReboot()
-    logger:dbg("Device is rebooting")
+    if self.settings:getSyncOnPowerOff() then
+       self:synchronizeOnEvent()
+    end
 end
 
 function Grimmory:onReaderReady()
@@ -108,10 +157,23 @@ end
 
 function Grimmory:onCloseDocument()
     logger:dbg("Document closing")
+
+    if self.settings:getSyncOnCloseDocument() then
+        -- Do not block the UI thread
+        UIManager:scheduleIn(0.1, function()
+            self:synchronizeOnEvent()
+        end)
+    end
 end
 
 function Grimmory:onGrimmorySync()
-    self:synchronize(true)
+    local ok, result = pcall(function()
+        self:synchronize(false)
+    end)
+
+    if not ok then
+        logger:warn("Error when synchronizing:", result)
+    end
 end
 
 function Grimmory:onGrimmorySettingsChanged()
@@ -127,10 +189,115 @@ function Grimmory:onGrimmorySettingsChanged()
     )
 end
 
+function Grimmory:isWifiOn()
+    local ok, result = pcall(function()
+        return NetworkManager:isWifiOn()
+    end)
+
+    if not ok then
+        logger:err("Something went wrong checking wifi state", result)
+        return true
+    end
+
+    return result
+end
+
+function Grimmory:isReadyToSync()
+    if self.settings:getBaseUri() == "" then
+        logger:info("BaseURI is not configured, cannot sync")
+        return false
+    end
+
+    return true
+end
+
+function Grimmory:isConnected()
+    if not self:isWifiOn() then
+        return false
+    end
+
+    local ok, result = pcall(function()
+        return NetworkManager:isConnected()
+    end)
+
+    if not ok then
+        logger:err("Something went wrong checking wifi connectivity", result)
+        return true
+    end
+
+    return result
+end
+
+function Grimmory:enableWifi()
+    logger:info("Enabling wifi")
+
+    local ok, result = pcall(function()
+        NetworkManager.turnOnWifi()
+
+        -- Wait for 10 seconds for connectivity to come up
+        local endTime = os.time() + 30
+        while os.time() < endTime do
+            if NetworkManager:isConnected() then
+                logger:info("Connected!")
+                return
+            end
+            -- Sleep for a little bit so we don't make a busy loop
+            Socket.select(nil, nil, 0.25)
+        end
+
+        logger:info("Timeout attempting to connect")
+    end)
+
+    if not ok then
+        logger:err("Unable to turn on wifi", result)
+    end
+end
+
+function Grimmory:disableWifi()
+    logger:info("Disabling wifi")
+    local ok, result = pcall(function()
+        return NetworkManager.turnOffWifi()
+    end)
+
+    if not ok then
+        logger:err("Unable to turn off wifi", result)
+    end
+end
+
+function Grimmory:synchronizeOnEvent()
+    if self:isReadyToSync() then
+        logger:info("Not ready to sync, skipping on event")
+        return false
+    end
+
+    local wifiNeedsDisable = false
+    if self.settings:getSyncEnableWifi() and not self:isWifiOn() then
+        wifiNeedsDisable = true
+        self:enableWifi()
+    end
+
+    if not self:isConnected() then
+        logger:info("Cannot sync without connectivity")
+        return
+    end
+
+    -- In the future, we should limit what we sync
+    -- to current or recent books.  For now, we sync everything.
+    local ok, result = pcall(function()
+        self:synchronize(false)
+    end)
+
+    if not ok then
+        logger:warn("Error when synchronizing:", result)
+    end
+
+    if wifiNeedsDisable then
+        self:disableWifi()
+    end
+end
+
 function Grimmory:synchronize(verbose)
     logger:info("Synchronizing to Grimmory")
-
-    -- TODO: Test connection and stop if it's not ready
 
     local progressInfo
 
@@ -144,65 +311,62 @@ function Grimmory:synchronize(verbose)
 
     local since = self.settings:getSynchronizedUntil()
 
-    NetworkManager:runWhenOnline(function()
-        local count = 0
-        local errorCount = 0
+    local count = 0
+    local errorCount = 0
 
-        local ok, result = pcall(function()
-            GrimmorySynchronize:synchronizeAll(
-                GrimmoryConnector,
-                since,
-                function(progress)
-                    if progress.since then
-                        -- Update since
-                        self.settings:setSynchronizedUntil(progress.since)
-                    end
-
-                    if progress.state == "success" then
-                        count = count + 1
-                    elseif progress.state == "error" then
-                        errorCount = errorCount + 1
-                    end
+    local ok, result = pcall(function()
+        GrimmorySynchronize:synchronizeAll(
+            GrimmoryConnector,
+            since,
+            function(progress)
+                if progress.since then
+                    -- Update since
+                    self.settings:setSynchronizedUntil(progress.since)
                 end
-            )
-        end)
 
-        if not ok then
-            logger:err("Failed sync", result)
-
-            if verbose then
-                UIManager:close(progressInfo)
-                progressInfo = InfoMessage:new({
-                    text = T(_("Failed to Synchronize to Grimmory")),
-                    timeout = 2,
-                })
-                UIManager:show(progressInfo)
+                if progress.state == "success" then
+                    count = count + 1
+                elseif progress.state == "error" then
+                    errorCount = errorCount + 1
+                end
             end
+        )
+    end)
 
-            return
-        end
+    if not ok then
+        logger:err("Failed sync", result)
 
         if verbose then
-            local message
-            if errorCount > 0 then
-                message = _("Completed Grimmory sync\n%1 session(s) recorded\n%2 session(s) failed")
-            else
-                message = _("Completed Grimmory sync\n%1 session(s) recorded")
-            end
-
             UIManager:close(progressInfo)
             progressInfo = InfoMessage:new({
-                text = T(
-                    message,
-                    count,
-                    errorCount
-                ),
-                timeout = 2
+                text = T(_("Failed to Synchronize to Grimmory")),
+                timeout = 2,
             })
             UIManager:show(progressInfo)
         end
 
-    end)
+        return
+    end
+
+    if verbose then
+        local message
+        if errorCount > 0 then
+            message = _("Completed Grimmory sync\n%1 session(s) recorded\n%2 session(s) failed")
+        else
+            message = _("Completed Grimmory sync\n%1 session(s) recorded")
+        end
+
+        UIManager:close(progressInfo)
+        progressInfo = InfoMessage:new({
+            text = T(
+                message,
+                count,
+                errorCount
+            ),
+            timeout = 2
+        })
+        UIManager:show(progressInfo)
+    end
 end
 
 return Grimmory
