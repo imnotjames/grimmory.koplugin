@@ -3,6 +3,7 @@ local ReadingSessions = require("reading_sessions")
 local logger = require("namespaced_logger").new("GrimmorySynchronize")
 
 local GrimmorySynchronize = {
+    synchronize_sessions_since = 0,
     threshold_seconds = 0,
     threshold_pages = 0,
 }
@@ -10,6 +11,10 @@ local GrimmorySynchronize = {
 function GrimmorySynchronize:setThresholds(seconds, pages)
     self.threshold_seconds = seconds
     self.threshold_pages = pages
+end
+
+function GrimmorySynchronize:setSynchronizeSessionsSince(since)
+    self.synchronize_sessions_since = since
 end
 
 function GrimmorySynchronize:getConnectorBookId(connector, bookId, bookMd5)
@@ -20,10 +25,10 @@ function GrimmorySynchronize:getConnectorBookId(connector, bookId, bookMd5)
     return bookId
 end
 
-function GrimmorySynchronize:synchronizeSessions(connector, since, callback)
-    logger:info("Synchronizing sessions since", since)
+function GrimmorySynchronize:synchronizeSessions(connector, callback)
+    logger:info("Synchronizing sessions since", self.synchronize_sessions_since)
 
-    local sessions = ReadingSessions.getSessions(since)
+    local sessions = ReadingSessions.getSessions(self.synchronize_sessions_since)
 
     for _, session in ipairs(sessions) do
         local totalSeconds = session.endTime - sessions.startTime
@@ -75,7 +80,7 @@ function GrimmorySynchronize:synchronizeSessions(connector, since, callback)
     end
 end
 
-function GrimmorySynchronize:synchronizeShelves(connector, since, callback)
+function GrimmorySynchronize:synchronizeShelves(connector, callback)
     local ok, shelves = connector:getShelves()
 
     if not ok then
@@ -182,10 +187,10 @@ function GrimmorySynchronize:synchronizeShelves(connector, since, callback)
     ReadCollection:write()
 end
 
-function GrimmorySynchronize:synchronizeAll(connector, since, callback)
-    self:synchronizeShelves(connector, since, callback)
+function GrimmorySynchronize:synchronizeAll(connector, callback)
+    self:synchronizeShelves(connector, callback)
 
-    self:synchronizeSessions(connector, since, callback)
+    self:synchronizeSessions(connector, callback)
 
     logger:info("Book download not implemented yet")
 

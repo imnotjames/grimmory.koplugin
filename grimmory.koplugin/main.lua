@@ -182,6 +182,10 @@ function Grimmory:onGrimmorySettingsChanged()
         self.settings:getSessionThresholdPages()
     )
 
+    GrimmorySynchronize:setSynchronizeSessionsSince(
+        self.settings:getSynchronizedUntil()
+    )
+
     GrimmoryConnector:setCredentials(
         self.settings:getBaseUri(),
         self.settings:getUsername(),
@@ -309,15 +313,12 @@ function Grimmory:synchronize(verbose)
         UIManager:show(progressInfo)
     end
 
-    local since = self.settings:getSynchronizedUntil()
-
     local count = 0
     local errorCount = 0
 
     local ok, result = pcall(function()
         GrimmorySynchronize:synchronizeAll(
             GrimmoryConnector,
-            since,
             function(progress)
                 if progress.since then
                     -- Update since
