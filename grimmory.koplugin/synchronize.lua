@@ -6,11 +6,18 @@ local GrimmorySynchronize = {
     synchronize_sessions_since = 0,
     threshold_seconds = 0,
     threshold_pages = 0,
+    sync_shelves = true,
+    sync_sessions = true,
 }
 
 function GrimmorySynchronize:setThresholds(seconds, pages)
     self.threshold_seconds = seconds
     self.threshold_pages = pages
+end
+
+function GrimmorySynchronize:setFeaturesEnabled(shelves, sessions)
+    self.sync_shelves = shelves
+    self.sync_sessions = sessions
 end
 
 function GrimmorySynchronize:setSynchronizeSessionsSince(since)
@@ -34,8 +41,8 @@ function GrimmorySynchronize:synchronizeSessions(connector, callback)
         local totalSeconds = session.endTime - sessions.startTime
         local totalPages = sessions.endPage - sessions.startPage + 1
 
-        if totalSeconds > self.threshold_seconds or totalPages > self.threshold_pages then
-            logger:err("Session skipped for book", session.bookId)
+        if not self.sync_sessions or (totalSeconds < self.threshold_seconds and totalPages < self.threshold_pages) then
+            logger:info("Session skipped for book", session.bookId)
             callback({
                 state = "session-skip",
                 bookId = session.bookId,
@@ -81,10 +88,16 @@ function GrimmorySynchronize:synchronizeSessions(connector, callback)
 end
 
 function GrimmorySynchronize:synchronizeShelves(connector, callback)
+    if not self.sync_shelves then
+        logger:info("Session sync skipped because feature is disabled")
+        return
+    end
+
     local ok, shelves = connector:getShelves()
 
     if not ok then
         logger:err("Could not connect to connector to get shelves", shelves)
+        return
     end
 
     local shelfIdToName = {}

@@ -106,7 +106,26 @@ function Grimmory:addToMainMenu(menu_items)
                 },
             },
             {
-                text = _("Session Threshold"),
+                text = _("Sync Shelves"),
+                checked_func = function()
+                    return self.settings:getSyncShelves()
+                end,
+                callback = function()
+                    self.settings:toggleSyncShelves()
+                end,
+                separator = true,
+            },
+            {
+                text = _("Sync Reading Sessions"),
+                checked_func = function()
+                    return self.settings:getSyncReadingSessions()
+                end,
+                callback = function()
+                    self.settings:toggleSyncReadingSessions()
+                end,
+            },
+            {
+                text = _("Reading Session Thresholds"),
                 callback = function()
                     self.settings:showSessionThresholdSettings()
                 end,
@@ -118,11 +137,7 @@ end
 function Grimmory:init()
     self.settings = GrimmorySettings:new()
 
-    GrimmoryConnector:setCredentials(
-        self.settings:getBaseUri(),
-        self.settings:getUsername(),
-        self.settings:getPassword()
-    )
+    self:onGrimmorySettingsChanged()
 
     self.ui.menu:registerToMainMenu(self)
 
@@ -180,6 +195,11 @@ function Grimmory:onGrimmorySettingsChanged()
     GrimmorySynchronize:setThresholds(
         self.settings:getSessionThresholdSeconds(),
         self.settings:getSessionThresholdPages()
+    )
+
+    GrimmorySynchronize:setFeaturesEnabled(
+        self.settings:getSyncShelves(),
+        self.settings:getSyncReadingSessions()
     )
 
     GrimmorySynchronize:setSynchronizeSessionsSince(

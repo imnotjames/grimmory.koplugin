@@ -33,6 +33,8 @@ local DEFAULTS = {
     syncOnSuspend = true,
     syncOnPowerOff = true,
     syncEnableWifi = false,
+    syncShelves = true,
+    syncReadingSessions = true,
 }
 
 local function openSettingsHandle()
@@ -251,6 +253,30 @@ end
 
 function GrimmorySettings:setSessionThresholdPages(sessionThresholdPages)
     self:update({ sessionThresholdPages = sessionThresholdPages })
+end
+
+function GrimmorySettings:toggleSyncShelves()
+    self:update({ syncShelves = not self:getSyncShelves() })
+end
+
+function GrimmorySettings:getSyncShelves()
+    if self.data.syncShelves == nil then
+        return DEFAULTS.syncShelves
+    end
+
+    return self.data.syncShelves
+end
+
+function GrimmorySettings:toggleSyncReadingSessions()
+    self:update({ syncReadingSessions = not self:getSyncReadingSessions() })
+end
+
+function GrimmorySettings:getSyncReadingSessions()
+    if self.data.syncReadingSessions == nil then
+        return DEFAULTS.syncReadingSessions
+    end
+
+    return self.data.syncReadingSessions
 end
 
 function GrimmorySettings:toggleSyncOnCloseDocument()
