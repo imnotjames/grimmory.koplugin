@@ -6,7 +6,7 @@ local GrimmorySynchronize = {
     threshold_pages = 0,
 }
 
-function ReadingSessions:setThresholds(seconds, pages)
+function GrimmorySynchronize:setThresholds(seconds, pages)
     self.threshold_seconds = seconds
     self.threshold_pages = pages
 end
