@@ -47,14 +47,14 @@ function GrimmoryConnector:setCredentials(baseUri, username, password)
 end
 
 function GrimmoryConnector:__refreshAccessToken()
-    credentials = {
+    local credentials = {
         username = self.username,
         password = self.password,
     }
 
-    ok, code, body = self:request("POST", "/api/v1/auth/login", credentials)
+    local ok, _, body = self:request("POST", "/api/v1/auth/login", credentials)
 
-    if ok then
+    if ok and body then
         self.__accessToken = body["accessToken"]
     end
 
@@ -70,7 +70,7 @@ function GrimmoryConnector:__getAccessToken()
 end
 
 function GrimmoryConnector:request(method, path, data, accessToken)
-    url = self.baseUri .. path
+    local url = self.baseUri .. path
 
     local headers = {}
 
@@ -78,10 +78,11 @@ function GrimmoryConnector:request(method, path, data, accessToken)
         headers["Authorization"] = "Bearer " .. accessToken
     end
 
+    local client
     if url:match("^http:") then
-        http_client = http
+        client = http
     elseif url:match("^https:") then
-        http_client = https
+        client = https
     else
         return false, 0, "unknown url scheme"
     end
@@ -98,7 +99,7 @@ function GrimmoryConnector:request(method, path, data, accessToken)
     local responseTable = {}
     local sink = ltn12.sink.table(responseTable)
 
-    local res, code, responseHeaders = http_client.request({
+    local _, code, _ = client.request({
         url = url,
         method = method,
         headers = headers,
@@ -114,7 +115,7 @@ function GrimmoryConnector:request(method, path, data, accessToken)
         if success then
             response = decodedResponse
         else
-            logger:warn("Failed to parse JSON:", result)
+            logger:warn("Failed to parse JSON:", responseText)
         end
     end
 
@@ -152,7 +153,7 @@ end
 
 function GrimmoryConnector:getCurrentUser()
     -- Check current user
-    ok, code, body = self:request(
+    local ok, code, body = self:request(
         "GET",
         "/api/v1/users/me",
         nil,
@@ -163,7 +164,7 @@ function GrimmoryConnector:getCurrentUser()
 end
 
 function GrimmoryConnector:getVersion()
-    ok, code, payload = self:request(
+    local ok, code, payload = self:request(
         "GET",
         "/api/v1/version",
         nil,
@@ -182,7 +183,7 @@ function GrimmoryConnector:getVersion()
         return ok, message
     end
 
-    return ok, payload.current
+    return ok, payload["current"]
 end
 
 function GrimmoryConnector:getBooks()
@@ -195,10 +196,9 @@ function GrimmoryConnector:getBooks()
 end
 
 function GrimmoryConnector:recordSession(bookId, startTime, endTime, startProgress, endProgress, startLocation, endLocation)
-    durationSeconds = endTime - startTime
-    durationFormatted = ""
-    progressDelta = math.max(0, endProgress - startProgress)
-    bookType = "EPUB"
+    local durationSeconds = endTime - startTime
+    local progressDelta = math.max(0, endProgress - startProgress)
+    local bookType = "EPUB"
 
     local readingSessionRequest = {
         boodId = bookId,
@@ -214,7 +214,7 @@ function GrimmoryConnector:recordSession(bookId, startTime, endTime, startProgre
         endLocation = nil,
     }
 
-    ok, _, _ = self:request(
+    local ok, _, _ = self:request(
         "POST",
         "/api/v1/reading-sessions",
         readingSessionRequest,

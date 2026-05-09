@@ -18,7 +18,7 @@ function ReadingSessions.__open()
     )
 end
 
-function ReadingSessions.getPageStatistics(since)
+function ReadingSessions:getPageStatistics(since)
     local conn = ReadingSessions.__open()
 
     local stmt = conn:prepare([[
@@ -61,10 +61,10 @@ function ReadingSessions.getPageStatistics(since)
     return results
 end
 
-function ReadingSessions.getSessions(since)
+function ReadingSessions:getSessions(since)
     local sessions = {}
 
-    for _, stat in ipairs(ReadingSessions.getPageStatistics(since)) do
+    for _, stat in ipairs(ReadingSessions:getPageStatistics(since)) do
         -- Eventually we could figure out progress from start of page
         -- to end of page?  But for now the simplest is to count
         -- progress as a point-in-time.

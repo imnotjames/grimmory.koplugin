@@ -34,8 +34,6 @@ function Grimmory:onDispatcherRegisterActions()
     title = _("Grimmory: Settings Changed"),
     general = true,
   })
-
-  
 end
 
 function Grimmory:addToMainMenu(menu_items)
@@ -170,6 +168,7 @@ function Grimmory:synchronize(verbose)
         end
 
         if verbose then
+            local message
             if errorCount > 0 then
                 message = _("Completed Grimmory sync\n%1 session(s) recorded\n%2 session(s) failed")
             else
