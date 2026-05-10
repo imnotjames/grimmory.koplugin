@@ -42,7 +42,7 @@ function Grimmory:addToMainMenu(menu_items)
         text = "Grimmory",
         sub_item_table = {
             {
-                text = _("Sync Now"),
+                text = _("Force Sync Now"),
                 enabled_func = function()
                     return self:isReadyToSync()
                 end,
