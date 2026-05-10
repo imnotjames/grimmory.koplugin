@@ -108,7 +108,7 @@ function GrimmoryConnector:request(method, path, data, accessToken)
     })
 
     local responseText = table.concat(responseTable)
-    local response = nil
+    local response = responseText
 
     if responseText ~= "" then
         local success, decodedResponse = pcall(json.decode, responseText)
