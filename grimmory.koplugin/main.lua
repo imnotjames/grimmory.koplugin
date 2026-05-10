@@ -321,7 +321,7 @@ function Grimmory:disableWifi()
 end
 
 function Grimmory:synchronizeOnEvent()
-    if self:isReadyToSync() then
+    if not self:isReadyToSync() then
         logger:info("Not ready to sync, skipping on event")
         return false
     end
