@@ -1,6 +1,7 @@
 local _ = require("gettext")
 local T = require("ffi/util").template
 
+local ButtonDialog = require("ui/widget/buttondialog")
 local Event = require("ui/event")
 local DataStorage = require("datastorage")
 local InfoMessage = require("ui/widget/infomessage")
@@ -35,6 +36,7 @@ local DEFAULTS = {
     syncEnableWifi = false,
     syncShelves = true,
     syncReadingSessions = true,
+    targetShelves = {},
 }
 
 local function openSettingsHandle()
@@ -169,6 +171,71 @@ function GrimmorySettings:showConnectionSettings()
     self.settingsDialog:onShowKeyboard()
 end
 
+function GrimmorySettings:showTargetShelvesSettings()
+    local ok, result = GrimmoryConnector:getShelves()
+
+    if not ok then
+        logger:err("Something went wrong loading shelves", result)
+        return
+    end
+
+    local buttons = {
+        {
+            {
+                text = _("Cancel Selection"),
+                callback = function()
+                    UIManager:close(self.settingsDialog)
+                end,
+            }
+        },
+        {
+            {
+                text = _("All Shelves"),
+                callback = function()
+                    logger:info("Set target shelves to All Shelves")
+                    self:setTargetShelves({})
+                    UIManager:close(self.settingsDialog)
+                end,
+            }
+        }
+    }
+
+    local shelfNameToId = {}
+
+    for _, shelf in ipairs(result) do
+        local shelfName = shelf.name
+        local shelfId = shelf.id
+
+        local uniqueShelfName = shelfName
+        local uniqueShelfIndex = 0
+        while shelfNameToId[uniqueShelfName] do
+            uniqueShelfIndex = uniqueShelfIndex + 1
+            uniqueShelfName = shelfName .. " " .. uniqueShelfIndex
+        end
+
+        table.insert(
+            buttons,
+            {
+                {
+                    text = uniqueShelfName,
+                    callback = function()
+                        logger:info("Set target shelves to shelf ID", shelfId)
+                        self:setTargetShelves({ { id = shelfId, name = uniqueShelfName } })
+                        UIManager:close(self.settingsDialog)
+                    end
+                }
+            }
+        )
+    end
+
+    self.settingsDialog = ButtonDialog:new({
+        title = _("Target Shelf"),
+        buttons = buttons,
+    })
+
+    UIManager:show(self.settingsDialog)
+end
+
 function GrimmorySettings:showSessionThresholdSettings()
     self.settingsDialog = MultiInputDialog:new({
         title = _("Session Thresholds"),
@@ -237,6 +304,14 @@ end
 
 function GrimmorySettings:setPassword(password)
     self:update({ password = password })
+end
+
+function GrimmorySettings:getTargetShelves()
+    return self.data.targetShelves or DEFAULTS.targetShelves
+end
+
+function GrimmorySettings:setTargetShelves(targetShelves)
+    self:update({ targetShelves = targetShelves })
 end
 
 function GrimmorySettings:getSessionThresholdSeconds()

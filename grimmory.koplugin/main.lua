@@ -113,6 +113,28 @@ function Grimmory:addToMainMenu(menu_items)
                 callback = function()
                     self.settings:toggleSyncShelves()
                 end,
+            },
+            {
+                text_func = function()
+                    local targetDescription = "All"
+
+                    local targetShelves = self.settings:getTargetShelves()
+
+                    local count = 0
+                    for _, shelf in ipairs(targetShelves) do
+                        if count == 0 then
+                            targetDescription = shelf.name
+                        else
+                            targetDescription = targetShelves .. ", " .. shelf.name
+                        end
+                        count = count + 1
+                    end
+
+                    return T(_("Source Shelves: %1"), targetDescription)
+                end,
+                callback = function()
+                    self.settings:showTargetShelvesSettings()
+                end,
                 separator = true,
             },
             {
@@ -195,6 +217,10 @@ function Grimmory:onGrimmorySettingsChanged()
     GrimmorySynchronize:setThresholds(
         self.settings:getSessionThresholdSeconds(),
         self.settings:getSessionThresholdPages()
+    )
+
+    GrimmorySynchronize:setTargetShelves(
+        self.settings:getTargetShelves()
     )
 
     GrimmorySynchronize:setFeaturesEnabled(

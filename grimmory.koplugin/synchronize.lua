@@ -8,11 +8,16 @@ local GrimmorySynchronize = {
     threshold_pages = 0,
     sync_shelves = true,
     sync_sessions = true,
+    target_shelves = {},
 }
 
 function GrimmorySynchronize:setThresholds(seconds, pages)
     self.threshold_seconds = seconds
     self.threshold_pages = pages
+end
+
+function GrimmorySynchronize:setTargetShelves(shelves)
+    self.target_shelves = shelves
 end
 
 function GrimmorySynchronize:setFeaturesEnabled(shelves, sessions)
@@ -87,6 +92,20 @@ function GrimmorySynchronize:synchronizeSessions(connector, callback)
     end
 end
 
+function GrimmorySynchronize:isTargetShelf(shelfId)
+    if #self.target_shelves == 0 then
+        return true
+    end
+
+    for _, shelf in self.target_shelves do
+        if shelf.id == shelfId then
+            return true
+        end
+    end
+
+    return false
+end
+
 function GrimmorySynchronize:synchronizeShelves(connector, callback)
     if not self.sync_shelves then
         logger:info("Session sync skipped because feature is disabled")
@@ -104,7 +123,7 @@ function GrimmorySynchronize:synchronizeShelves(connector, callback)
     local shelfNameToId = {}
 
     for _, shelf in ipairs(shelves) do
-        if shelf.id and shelf.name then
+        if shelf.id and shelf.name and self:isTargetShelf(shelf.id) then
             local shelfName = shelf.name:lower()
 
             logger:dbg("Shelf received from connector", shelf.id, shelfName)
@@ -123,30 +142,38 @@ function GrimmorySynchronize:synchronizeShelves(connector, callback)
                 logger:dbg("Duplicate shelf name found", shelfName, "- used new name", uniqueShelfName)
             end
 
-            shelfIdToName[shelf.id] = shelfName
             shelfNameToId[uniqueShelfName] = shelf.id
+
+            -- use tostring to get a sparse table
+            shelfIdToName[tostring(shelf.id)] = shelfName
         end
     end
 
     -- Read through existing collections and compare against shelves
     for collectionName, _ in pairs(ReadCollection.coll) do
         local connectorId = ReadCollection.coll_settings[collectionName].connectorId
+        logger:info("CONNECTOR", collectionName, connectorId)
 
         if connectorId then
-            if shelfIdToName[connectorId] then
+            if shelfIdToName[tostring(connectorId)] then
+                local shelfName = shelfIdToName[tostring(connectorId)]
+
                 -- This collection exists as a shelf so we should update it
                 -- if there's anything that needs to change.
-                if shelfIdToName[connectorId] ~= collectionName then
+                if shelfName ~= collectionName:lower() then
                     -- This collection has been renamed!
-                    ReadCollection:renameCollection(collectionName, shelfIdToName[connectorId])
+                    logger:info("Renaming collection to match shelf name:", collectionName, ";", shelfName)
+
+                    ReadCollection:renameCollection(collectionName, shelfName)
 
                     callback({
                         state = "shelf-rename",
                         shelfId = connectorId,
-                        shelfName = shelfIdToName[connectorId],
+                        shelfName = shelfName,
                     })
                 end
             else
+                logger:info("Disconnecting collection from shelf:", collectionName)
                 -- This was a shelf but the shelf is gone in the connector
                 -- Don't delete the shelf but break the connection.
                 ReadCollection.coll_settings[collectionName].connectorId = nil
@@ -163,12 +190,12 @@ function GrimmorySynchronize:synchronizeShelves(connector, callback)
             end
         end
 
-        if connectorId ~= nil and shelfNameToId[collectionName] then
+        if connectorId == nil and shelfNameToId[collectionName:lower()] then
             -- If there is no shelf attached to this collection but we
             -- know one exists we should attach it.
-            connectorId = shelfNameToId[collectionName]
+            connectorId = shelfNameToId[collectionName:lower()]
 
-            logger:info("Found an existing collection that can be attached to a shelf:", collectionName, connectorId)
+            logger:info("Found an existing collection that can be attached to a shelf:", collectionName, ";" , connectorId)
 
             ReadCollection.coll_settings[collectionName].connectorId = connectorId
 
@@ -181,7 +208,7 @@ function GrimmorySynchronize:synchronizeShelves(connector, callback)
     end
 
     -- Make sure every shelf has a collection and create them if not
-    for connectorId, shelfName in ipairs(shelfIdToName) do
+    for shelfName, connectorId in pairs(shelfNameToId) do
         if not ReadCollection.coll_settings[shelfName] then
             logger:info("Adding a collection from a shelf", shelfName, connectorId)
 
@@ -191,7 +218,7 @@ function GrimmorySynchronize:synchronizeShelves(connector, callback)
             callback({
                 state = "shelf-add",
                 shelfId = connectorId,
-                shelfName = shelfIdToName[connectorId],
+                shelfName = shelfName,
             })
         end
     end
