@@ -19,6 +19,7 @@ local Grimmory = WidgetContainer:extend{
     name = "grimmory",
     is_doc_only = false,
     is_stub = false,
+    last_periodic_sync = nil,
 }
 
 function Grimmory:onDispatcherRegisterActions()
@@ -93,8 +94,30 @@ function Grimmory:addToMainMenu(menu_items)
                         end,
                         callback = function()
                             self.settings:toggleSyncOnPowerOff()
+                            UIManager:broadcastEvent(Event:new("GrimmorySettingsChanged"))
                         end,
                         keep_menu_open = true,
+                        separator = true,
+                    },
+                    {
+                        text = _("Periodically Sync"),
+                        checked_func = function()
+                            return self.settings:getSyncPeriodically()
+                        end,
+                        callback = function()
+                            self.settings:toggleSyncPeriodically()
+                            self:onGrimmorySettingsChanged()
+                        end,
+                        keep_menu_open = true,
+                    },
+                    {
+                        text_func = function()
+                            local frequency = self.settings:getSyncFrequency()
+                            return T(_("Frequency: %1 minutes"), frequency)
+                        end,
+                        callback = function()
+                            self.settings:showSyncFrequencySettings()
+                        end,
                         separator = true,
                     },
                     {
@@ -220,6 +243,8 @@ function Grimmory:onGrimmorySync()
 end
 
 function Grimmory:onGrimmorySettingsChanged()
+    logger:info("Settings Changes")
+
     GrimmorySynchronize:setThresholds(
         self.settings:getSessionThresholdSeconds(),
         self.settings:getSessionThresholdPages()
@@ -243,6 +268,49 @@ function Grimmory:onGrimmorySettingsChanged()
         self.settings:getUsername(),
         self.settings:getPassword()
     )
+
+    if self.settings:getSyncPeriodically() then
+        self:schedulePeriodicPush()
+    else
+        self:unschedulePeriodicPush()
+    end
+end
+
+function Grimmory:unschedulePeriodicPush()
+    logger:info("Unscheduling periodic sync")
+
+    self.last_periodic_sync = nil
+    UIManager:unschedule(self.onGrimmorySyncPeriodically)
+end
+
+function Grimmory:schedulePeriodicPush()
+    local minutesToNextSync = self.settings:getSyncFrequency()
+
+    if self.last_periodic_sync ~= nil then
+        local minutesSinceLastSync = (os.time() - self.last_periodic_sync) / 60
+
+        minutesToNextSync = minutesToNextSync - minutesSinceLastSync
+        minutesToNextSync = math.max(0, minutesToNextSync)
+    else
+        -- If a periodic sync has never been done before we set to right now
+        self.last_periodic_sync = os.time()
+    end
+
+    logger:info("Scheduling next sync in", minutesToNextSync, "minutes")
+
+    UIManager:unschedule(self.onGrimmorySyncPeriodically)
+    UIManager:scheduleIn(minutesToNextSync * 60, self.onGrimmorySyncPeriodically, self)
+end
+
+function Grimmory:onGrimmorySyncPeriodically()
+    logger:info("Periodic Sync starting")
+
+    -- Schedule the next periodic sync
+    self.last_periodic_sync = os.time()
+    self:schedulePeriodicPush()
+
+    -- Run the synchronization
+    self:synchronizeOnEvent()
 end
 
 function Grimmory:isWifiOn()

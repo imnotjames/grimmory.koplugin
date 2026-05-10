@@ -17,8 +17,8 @@ local GrimmoryConnector = require("connectors/grimmory_connector")
 -- elements to control Grimmory connections & sync.
 
 local GrimmorySettings = {
-  settings = nil, -- LuaSettings handle
-  data = nil, -- in-memory normalized table
+  settings = nil,
+  data = nil,
 }
 GrimmorySettings.__index = GrimmorySettings
 
@@ -34,6 +34,8 @@ local DEFAULTS = {
     syncOnSuspend = true,
     syncOnPowerOff = true,
     syncEnableWifi = false,
+    syncPeriodically = false,
+    syncFrequency = 120,
     syncShelves = true,
     syncReadingSessions = true,
     targetShelves = {},
@@ -242,6 +244,45 @@ function GrimmorySettings:showTargetShelvesSettings()
     UIManager:show(self.settingsDialog)
 end
 
+function GrimmorySettings:showSyncFrequencySettings()
+    self.settingsDialog = MultiInputDialog:new({
+        title = _("Periodic Sync Frequency"),
+        fields = {
+            {
+                text = self:getSyncFrequency(),
+                description = _("Minutes between synchronization"),
+                input_type = "number"
+            },
+        },
+        buttons = {
+            {
+            {
+                text = _("Cancel"),
+                id = "close",
+                callback = function()
+                    UIManager:close(self.settingsDialog)
+                end,
+            },
+            {
+                text = _("Apply"),
+                callback = function()
+                    local fields = self.settingsDialog:getFields()
+
+                    self:setSyncFrequency(math.max(0, fields[1]))
+
+                    UIManager:broadcastEvent(Event:new("GrimmorySettingsChanged"))
+
+                    UIManager:close(self.settingsDialog)
+                end,
+            },
+            },
+        },
+    })
+
+    UIManager:show(self.settingsDialog)
+    self.settingsDialog:onShowKeyboard()
+end
+
 function GrimmorySettings:showSessionThresholdSettings()
     self.settingsDialog = MultiInputDialog:new({
         title = _("Session Thresholds"),
@@ -358,6 +399,27 @@ function GrimmorySettings:getSyncReadingSessions()
     end
 
     return self.data.syncReadingSessions
+end
+
+function GrimmorySettings:toggleSyncPeriodically()
+    self:update({ syncPeriodically = not self:getSyncPeriodically()})
+end
+
+function GrimmorySettings:getSyncPeriodically()
+    if self.data.syncPeriodically == nil then
+        return DEFAULTS.syncPeriodically
+    end
+
+    return self.data.syncPeriodically
+end
+
+
+function GrimmorySettings:setSyncFrequency(syncFrequency)
+    self:update({ syncFrequency = syncFrequency })
+end
+
+function GrimmorySettings:getSyncFrequency()
+    return self.data.syncFrequency or DEFAULTS.syncFrequency
 end
 
 function GrimmorySettings:toggleSyncOnCloseDocument()
