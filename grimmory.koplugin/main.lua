@@ -71,6 +71,7 @@ function Grimmory:addToMainMenu(menu_items)
                         end,
                         callback = function()
                             self.settings:toggleSyncOnCloseDocument()
+                            UIManager:broadcastEvent(Event:new("GrimmorySettingsChanged"))
                         end,
                         keep_menu_open = true,
                     },
@@ -81,6 +82,7 @@ function Grimmory:addToMainMenu(menu_items)
                         end,
                         callback = function()
                             self.settings:toggleSyncOnSuspend()
+                            UIManager:broadcastEvent(Event:new("GrimmorySettingsChanged"))
                         end,
                         keep_menu_open = true,
                     },
@@ -102,6 +104,7 @@ function Grimmory:addToMainMenu(menu_items)
                         end,
                         callback = function()
                             self.settings:toggleSyncEnableWifi()
+                            UIManager:broadcastEvent(Event:new("GrimmorySettingsChanged"))
                         end,
                     },
                 },
@@ -113,6 +116,7 @@ function Grimmory:addToMainMenu(menu_items)
                 end,
                 callback = function()
                     self.settings:toggleSyncShelves()
+                    UIManager:broadcastEvent(Event:new("GrimmorySettingsChanged"))
                 end,
             },
             {
@@ -145,6 +149,7 @@ function Grimmory:addToMainMenu(menu_items)
                 end,
                 callback = function()
                     self.settings:toggleSyncReadingSessions()
+                    UIManager:broadcastEvent(Event:new("GrimmorySettingsChanged"))
                 end,
             },
             {

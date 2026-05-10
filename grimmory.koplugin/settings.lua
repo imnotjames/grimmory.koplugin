@@ -158,7 +158,7 @@ function GrimmorySettings:showConnectionSettings()
                     self:setUsername(fields[2])
                     self:setPassword(fields[3])
 
-                    UIManager:sendEvent(Event:new("GrimmorySettingsChanged"))
+                    UIManager:broadcastEvent(Event:new("GrimmorySettingsChanged"))
 
                     UIManager:close(self.settingsDialog)
                 end,
@@ -194,6 +194,9 @@ function GrimmorySettings:showTargetShelvesSettings()
                 callback = function()
                     logger:info("Set target shelves to All Shelves")
                     self:setTargetShelves({})
+
+                    UIManager:broadcastEvent(Event:new("GrimmorySettingsChanged"))
+
                     UIManager:close(self.settingsDialog)
                 end,
             }
@@ -221,6 +224,9 @@ function GrimmorySettings:showTargetShelvesSettings()
                     callback = function()
                         logger:info("Set target shelves to shelf ID", shelfId)
                         self:setTargetShelves({ { id = shelfId, name = uniqueShelfName } })
+
+                        UIManager:broadcastEvent(Event:new("GrimmorySettingsChanged"))
+
                         UIManager:close(self.settingsDialog)
                     end
                 }
@@ -268,7 +274,7 @@ function GrimmorySettings:showSessionThresholdSettings()
                     self:setSessionThresholdSeconds(math.max(0, fields[1]))
                     self:setSessionThresholdPages(math.max(0, fields[2]))
 
-                    UIManager:sendEvent(Event:new("GrimmorySettingsChanged"))
+                    UIManager:broadcastEvent(Event:new("GrimmorySettingsChanged"))
 
                     UIManager:close(self.settingsDialog)
                 end,
