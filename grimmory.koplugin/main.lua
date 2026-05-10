@@ -61,7 +61,8 @@ function Grimmory:addToMainMenu(menu_items)
                 end,
             },
             {
-                text = _("Sync Configuration"),
+                text = _("Automatic Sync"),
+                separator = true,
                 sub_item_table = {
                     {
                         text = _("On Close Document"),
