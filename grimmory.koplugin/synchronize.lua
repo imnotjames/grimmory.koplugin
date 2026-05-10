@@ -152,7 +152,6 @@ function GrimmorySynchronize:synchronizeShelves(connector, callback)
     -- Read through existing collections and compare against shelves
     for collectionName, _ in pairs(ReadCollection.coll) do
         local connectorId = ReadCollection.coll_settings[collectionName].connectorId
-        logger:info("CONNECTOR", collectionName, connectorId)
 
         if connectorId then
             if shelfIdToName[tostring(connectorId)] then
