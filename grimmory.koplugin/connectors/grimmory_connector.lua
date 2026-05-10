@@ -195,6 +195,21 @@ function GrimmoryConnector:getBooks()
     )
 end
 
+function GrimmoryConnector:getShelves()
+    local ok, _, body = self:request(
+        "GET",
+        "/api/v1/shelves",
+        nil,
+        self:__getAccessToken()
+    )
+
+    if not ok then
+        return false, body
+    end
+
+    return ok, body
+end
+
 function GrimmoryConnector:recordSession(bookId, startTime, endTime, startProgress, endProgress, startLocation, endLocation)
     local durationSeconds = endTime - startTime
     local progressDelta = math.max(0, endProgress - startProgress)
