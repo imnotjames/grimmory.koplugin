@@ -5,10 +5,10 @@ local ReaderUI = require("apps/reader/readerui")
 
 local logger = require("namespaced_logger").new("reading_sessions")
 
-local SESSION_COLLAPSE_THRESHOLD = 120.0
+local SESSION_COLLAPSE_THRESHOLD = 60.0
 
 local ReadingSessions = {
-    statistics_database_file =  DataStorage:getSettingsDir() .. "/statistics.sqlite3"
+    statistics_database_file =  DataStorage:getSettingsDir() .. "/statistics.sqlite3",
 }
 
 function ReadingSessions.__open()
