@@ -215,7 +215,7 @@ function GrimmorySynchronize:isTargetShelf(shelfId)
         return true
     end
 
-    for _, shelf in self.target_shelves do
+    for _, shelf in ipairs(self.target_shelves) do
         if shelf.id == shelfId then
             return true
         end
