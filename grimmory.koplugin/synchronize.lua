@@ -1,4 +1,8 @@
+local Cache = require("cache")
 local ReadCollection = require("readcollection")
+local util = require("util")
+
+local DocMetadata = require("doc_metadata")
 local ReadingSessions = require("reading_sessions")
 local logger = require("namespaced_logger").new("GrimmorySynchronize")
 
@@ -9,6 +13,8 @@ local GrimmorySynchronize = {
     sync_shelves = true,
     sync_sessions = true,
     target_shelves = {},
+    connector_id_cache = Cache:new({ slots = 4096 }),
+    identifiers_to_connector_id = nil,
 }
 
 function GrimmorySynchronize:setThresholds(seconds, pages)
@@ -29,12 +35,118 @@ function GrimmorySynchronize:setSynchronizeSessionsSince(since)
     self.synchronize_sessions_since = since
 end
 
-function GrimmorySynchronize:getConnectorBookId(connector, bookId, bookMd5)
-    -- TODO: translate from koreader book ID to grimmory book ID
+function GrimmorySynchronize:getTitleIdentifier(title, author)
+    if title == nil then
+        return nil
+    end
 
-    -- Get ISBN and check for that first
-    -- Search all books by title and author
-    return bookId
+    if author == nil then
+        author = "NA"
+    end
+
+    local titleIdentifier = title:lower():gsub("[^a-z0-9]+", "") .. "--" .. author:lower():gsub("[^a-z0-9]+", "")
+
+    if string.len(titleIdentifier) < 5 then
+        return nil
+    end
+
+    return titleIdentifier
+end
+
+function GrimmorySynchronize:getIdentifierMapping(connector)
+    if self.identifiers_to_connector_id ~= nil then
+        return self.identifiers_to_connector_id
+    end
+
+    local identifiersToConnectorId = {}
+
+    local ok, books = connector:getBooks()
+
+    if not ok then
+        logger:err("Something went wrong feetching books", books)
+        return {}
+    end
+
+    for _, book in ipairs(books) do
+        local metadata = book["metadata"]
+
+        if metadata then
+            if metadata["asin"] then
+                identifiersToConnectorId["asin:" .. metadata["asin"]:lower()] = book.id
+            end
+
+            if metadata["isbn13"] then
+                identifiersToConnectorId["isbn:" .. metadata["isbn13"]] = book.id
+            elseif metadata["isbn10"] then
+                identifiersToConnectorId["isbn:" .. metadata["isbn10"]] = book.id
+            end
+
+            if metadata["title"] and metadata["authors"] then
+                local author = metadata["authors"][0] or metadata["authors"][1]
+                local titleIdentifier = self:getTitleIdentifier(metadata["title"], author)
+
+                if titleIdentifier then
+                    identifiersToConnectorId["title-id:" .. titleIdentifier] = book.id
+                end
+            end
+        end
+
+        if book["primaryFile"] and book["primaryFile"]["filename"] then
+            identifiersToConnectorId["filename:" .. book["primaryFile"]["filename"]] = book.id
+        end
+
+    end
+
+    self.identifiers_to_connector_id = identifiersToConnectorId
+
+    return identifiersToConnectorId
+end
+
+function GrimmorySynchronize:getConnectorBookId(connector, bookPath, bookMd5)
+    local cacheValue = self.connector_id_cache:get(bookMd5:lower())
+    if cacheValue ~= nil then
+        logger:dbg("Cache hit", bookMd5, bookPath)
+        if cacheValue < 0 then
+            return nil
+        end
+
+        return cacheValue
+    end
+
+    logger:dbg("Cache miss", bookMd5, bookPath)
+
+    local isbn = DocMetadata:getISBN(bookPath)
+    local asin = DocMetadata:getASIN(bookPath)
+    local title = DocMetadata:getTitle(bookPath)
+    local author = DocMetadata:getAuthor(bookPath)
+
+    local bookId = -1
+
+    -- Instead of this, we should use a Grimmory search functionality.
+    -- This works well enough for today, though.
+    local identifiers = self:getIdentifierMapping(connector)
+
+    local titleId = self:getTitleIdentifier(title, author)
+    local _, filename = util.splitFilePathName(bookPath)
+    if identifiers ~= nil then
+        if isbn and identifiers["isbn:" .. isbn] then
+            bookId = identifiers["isbn:" .. isbn]
+        elseif asin and identifiers["asin:" .. asin:lower()] then
+            bookId = identifiers["asin:" .. asin:lower()]
+        elseif titleId and identifiers["title-id:" .. titleId] then
+            bookId = identifiers["title-id:" .. titleId]
+        elseif filename and identifiers["filename:" .. filename] then
+            bookId = identifiers["filename:" .. filename]
+        end
+    end
+
+    self.connector_id_cache:insert(bookMd5:lower(), bookId)
+
+    if bookId < 0 then
+        return nil
+    else
+        return bookId
+    end
 end
 
 function GrimmorySynchronize:synchronizeSessions(connector, callback)
@@ -43,48 +155,54 @@ function GrimmorySynchronize:synchronizeSessions(connector, callback)
     local sessions = ReadingSessions.getSessions(self.synchronize_sessions_since)
 
     for _, session in ipairs(sessions) do
-        local totalSeconds = session.endTime - sessions.startTime
-        local totalPages = sessions.endPage - sessions.startPage + 1
+        local totalSeconds = session.endTime - session.startTime
+        local totalPages = session.endPage - session.startPage + 1
 
         if not self.sync_sessions or (totalSeconds < self.threshold_seconds and totalPages < self.threshold_pages) then
-            logger:info("Session skipped for book", session.bookId)
+            logger:info("Session skipped for book", session.bookPath)
             callback({
                 state = "session-skip",
-                bookId = session.bookId,
+                bookPath = session.bookPath,
                 since = session.startTime,
             })
         else
             logger:dbg(
                 "Recording session",
-                session.bookId,
+                session.bookPath,
                 session.startTime,
                 session.endTime,
                 session.startProgress,
                 session.endProgress
             )
 
-            local connectorBookId = self:getConnectorBookId(connector, session.bookId, session.bookMd5)
+            local connectorBookId = self:getConnectorBookId(connector, session.bookPath, session.bookMd5)
 
-            local ok = connector:recordSession(
-                connectorBookId,
-                session.startTime,
-                session.endTime,
-                session.startProgress,
-                session.endProgress
-            )
+            local ok = false
+            local body = nil
+            if connectorBookId == nil then
+                body = "Could not match local book to connector"
+            else
+                ok, body = connector:recordSession(
+                    connectorBookId,
+                    session.startTime,
+                    session.endTime,
+                    session.startProgress,
+                    session.endProgress
+                )
+            end
 
             if ok then
-                logger:info("Session recorded successfully for book", session.bookId)
+                logger:info("Session recorded successfully for book", session.bookPath)
                 callback({
                     state = "session-success",
-                    bookId = session.bookId,
+                    bookPath = session.bookPath,
                     since = session.startTime,
                 })
             else
-                logger:err("Session failed recording with error for book", session.bookId)
+                logger:err("Session failed recording with error for book: ", session.bookPath, " - ", body)
                 callback({
                     state = "session-error",
-                    bookId = session.bookId,
+                    bookPath = session.bookPath,
                     since = session.startTime,
                 })
             end
@@ -227,6 +345,9 @@ function GrimmorySynchronize:synchronizeShelves(connector, callback)
 end
 
 function GrimmorySynchronize:synchronizeAll(connector, callback)
+    -- Reset so we pull fresh connector identifiers
+    self.identifiers_to_connector_id = nil
+
     self:synchronizeShelves(connector, callback)
 
     self:synchronizeSessions(connector, callback)
