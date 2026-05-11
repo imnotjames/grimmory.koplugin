@@ -277,7 +277,7 @@ function Grimmory:onGrimmorySettingsChanged()
 end
 
 function Grimmory:unschedulePeriodicPush()
-    logger:info("Unscheduling periodic sync")
+    logger:dbg("Unscheduling periodic sync")
 
     self.last_periodic_sync = nil
     UIManager:unschedule(self.onGrimmorySyncPeriodically)
