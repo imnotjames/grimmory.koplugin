@@ -432,6 +432,25 @@ function GrimmorySynchronize:getBookDownloadPath(connector, book)
     return nil
 end
 
+function GrimmorySynchronize:associateWithShelves(bookPath, shelves)
+    local connectorIdToName = {}
+    for collectionName, _ in pairs(ReadCollection.coll) do
+        local connectorId = ReadCollection.coll_settings[collectionName].connectorId
+
+        if connectorId then
+            connectorIdToName[tostring(connectorId)] = collectionName
+        end
+    end
+
+    for _, shelfId in ipairs(shelves) do
+        local collectionName = connectorIdToName[tostring(shelfId)]
+
+        if collectionName then
+            ReadCollection:addItem(bookPath, collectionName)
+        end
+    end
+end
+
 function GrimmorySynchronize:synchronizeBooks(connector, callback)
     if not self.sync_shelves then
         logger:info("Book download skipped because feature is disabled")
@@ -459,9 +478,10 @@ function GrimmorySynchronize:synchronizeBooks(connector, callback)
     for _, book in ipairs(books) do
         local bookExists = false
 
-        -- TODO: Search through known books from shelves for this book
-
         local downloadPath = self:getBookDownloadPath(connector, book)
+
+        -- TODO: Search through known books from shelves for this book
+        --       If found, set the `download path to that value.
 
         if util.fileExists(downloadPath) then
             bookExists = true
@@ -478,6 +498,7 @@ function GrimmorySynchronize:synchronizeBooks(connector, callback)
                     bookId = book.id,
                     downloadPath = downloadPath,
                 })
+                bookExists = true
             else
                 logger:err("Book failed download:", book.id, "-", message)
                 callback({
@@ -492,6 +513,12 @@ function GrimmorySynchronize:synchronizeBooks(connector, callback)
                 bookId = book.id,
                 downloadPath = downloadPath,
             })
+        end
+
+        if bookExists then
+            -- After we're done, if the book exists we should attach it
+            -- to associated shelves.
+            self:associateWithShelves(downloadPath, book.shelves)
         end
     end
 end
