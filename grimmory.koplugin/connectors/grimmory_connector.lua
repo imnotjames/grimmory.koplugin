@@ -69,7 +69,7 @@ function GrimmoryConnector:__getAccessToken()
     return self:__refreshAccessToken()
 end
 
-function GrimmoryConnector:request(method, path, data, accessToken)
+function GrimmoryConnector:request(method, path, data, accessToken, sink)
     local url = self.baseUri .. path
 
     local headers = {}
@@ -100,8 +100,9 @@ function GrimmoryConnector:request(method, path, data, accessToken)
     end
 
     local responseTable = {}
-    local sink = ltn12.sink.table(responseTable)
-
+    if sink == nil then
+        sink = ltn12.sink.table(responseTable)
+    end
     local _, code, _ = client.request({
         url = url,
         method = method,
@@ -207,6 +208,31 @@ function GrimmoryConnector:getBooks()
     )
 
     return ok, payload or {}
+end
+
+function GrimmoryConnector:downloadBook(bookId, destinationPath)
+    local path = "/api/v1/books/" .. tonumber(bookId) .. "/download"
+
+    local destinationFile, fileError = io.open(destinationPath, "wb")
+    if not destinationFile then
+        return false, fileError or "Unknown error opening file"
+    end
+
+    local sink = ltn12.sink.file(destinationFile)
+
+    local ok, code, message = self:request("GET", path, nil, self:__getAccessToken(), sink)
+
+    if not ok then
+        os.remove(destinationPath)
+
+        if not message then
+            message = "HTTP Error: " .. tostring(code)
+        end
+
+        return false, message
+    end
+
+    return true, destinationPath
 end
 
 function GrimmoryConnector:getShelves()
