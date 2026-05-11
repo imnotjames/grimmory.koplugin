@@ -13,7 +13,7 @@ local GrimmorySynchronize = {
     sync_shelves = true,
     sync_sessions = true,
     target_shelves = {},
-    connector_id_cache = Cache:new({ slots = 4096 }),
+    md5_to_connector_id_cache = Cache:new({ slots = 4096 }),
     identifiers_to_connector_id = nil,
     connector_id_to_shelves = nil,
 }
@@ -108,7 +108,7 @@ function GrimmorySynchronize:refreshBooksFromConnector(connector)
 end
 
 function GrimmorySynchronize:getConnectorBookId(connector, bookPath, bookMd5)
-    local cacheValue = self.connector_id_cache:get(bookMd5:lower())
+    local cacheValue = self.md5_to_connector_id_cache:get(bookMd5:lower())
     if cacheValue ~= nil then
         logger:dbg("ID Cache hit", bookMd5, bookPath)
         if cacheValue < 0 then
@@ -145,7 +145,7 @@ function GrimmorySynchronize:getConnectorBookId(connector, bookPath, bookMd5)
         end
     end
 
-    self.connector_id_cache:insert(bookMd5:lower(), bookId)
+    self.md5_to_connector_id_cache:insert(bookMd5:lower(), bookId)
 
     if bookId < 0 then
         return nil
