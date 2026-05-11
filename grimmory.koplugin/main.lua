@@ -41,6 +41,7 @@ end
 function Grimmory:addToMainMenu(menu_items)
     menu_items.grimmory = {
         text = "Grimmory",
+        sorting_hint = "tools",
         sub_item_table = {
             {
                 text = _("Force Sync Now"),
