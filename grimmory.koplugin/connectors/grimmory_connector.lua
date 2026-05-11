@@ -222,13 +222,13 @@ function GrimmoryConnector:getShelves()
     return ok, body
 end
 
-function GrimmoryConnector:recordSession(bookId, startTime, endTime, startProgress, endProgress, startLocation, endLocation)
+function GrimmoryConnector:recordSession(bookId, startTime, endTime, startProgress, endProgress)
     local durationSeconds = endTime - startTime
     local progressDelta = math.max(0, endProgress - startProgress)
     local bookType = "EPUB"
 
     local readingSessionRequest = {
-        boodId = bookId,
+        bookId = bookId,
         bookType = bookType,
         startTime = toISO8601(startTime),
         endTime = toISO8601(endTime),
@@ -241,14 +241,14 @@ function GrimmoryConnector:recordSession(bookId, startTime, endTime, startProgre
         endLocation = nil,
     }
 
-    local ok, _, _ = self:request(
+    local ok, _, body = self:request(
         "POST",
         "/api/v1/reading-sessions",
         readingSessionRequest,
         self:__getAccessToken()
     )
 
-    return ok
+    return ok, body
 end
 
 return GrimmoryConnector
