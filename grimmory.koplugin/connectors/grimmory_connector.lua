@@ -126,8 +126,17 @@ function GrimmoryConnector:request(method, path, data, accessToken)
         logger:err("Non-numeric response code received:", tostring(code))
         return false, 0, "Connection error: " .. tostring(code)
     end
-    
+
     if code >= 400 then
+        logger:dbg("Grimmory Connector Request Error", method, path, code, response)
+        if type(response) == "table" then
+            if response.message then
+                response = response.message
+            elseif response.error then
+                response = response.error
+            end
+        end
+
         return false, code, response
     end
 
