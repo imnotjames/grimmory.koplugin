@@ -28,7 +28,7 @@ local DEFAULTS = {
     baseUri = "",
     username = "",
     password = "",
-    sessionThresholdSeconds = 30,
+    sessionThresholdSeconds = 60,
     sessionThresholdPages = 0,
     syncOnCloseDocument = true,
     syncOnSuspend = true,
@@ -289,13 +289,13 @@ function GrimmorySettings:showSessionThresholdSettings()
         fields = {
             {
                 text = self:getSessionThresholdSeconds(),
-                description = _("Seconds to create a session"),
-                input_type = "number"
+                description = _("Minimum Session Seconds"),
+                input_type = "number",
             },
             {
                 text = self:getSessionThresholdPages(),
-                description = _("Pages to create a session"),
-                input_type = "number"
+                description = _("Minimum Session Pages"),
+                input_type = "number",
             },
         },
         buttons = {
