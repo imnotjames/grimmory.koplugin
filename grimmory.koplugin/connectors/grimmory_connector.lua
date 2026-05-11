@@ -91,8 +91,11 @@ function GrimmoryConnector:request(method, path, data, accessToken)
     local source = nil
 
     if data then
-        headers["Content-Type"] = "application/json"
         body = json.encode(data)
+
+        headers["Content-Type"] = "application/json"
+        headers["Content-Length"] = string.len(body)
+
         source = ltn12.source.string(body)
     end
 
