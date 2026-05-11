@@ -15,6 +15,7 @@ local GrimmorySynchronize = {
     target_shelves = {},
     connector_id_cache = Cache:new({ slots = 4096 }),
     identifiers_to_connector_id = nil,
+    connector_id_to_shelves = nil,
 }
 
 function GrimmorySynchronize:setThresholds(seconds, pages)
@@ -53,12 +54,9 @@ function GrimmorySynchronize:getTitleIdentifier(title, author)
     return titleIdentifier
 end
 
-function GrimmorySynchronize:getIdentifierMapping(connector)
-    if self.identifiers_to_connector_id ~= nil then
-        return self.identifiers_to_connector_id
-    end
-
+function GrimmorySynchronize:refreshBooksFromConnector(connector)
     local identifiersToConnectorId = {}
+    local connectorIdToShelves = {}
 
     local ok, books = connector:getBooks()
 
@@ -95,17 +93,24 @@ function GrimmorySynchronize:getIdentifierMapping(connector)
             identifiersToConnectorId["filename:" .. book["primaryFile"]["filename"]] = book.id
         end
 
+        -- Use a string for key for sparse tables
+        local shelves = {}
+        if book["shelves"] then
+            for _, shelf in ipairs(book["shelves"]) do
+                table.insert(shelves, shelf.id)
+            end
+        end
+        connectorIdToShelves[tostring(book["id"])] = shelves
     end
 
     self.identifiers_to_connector_id = identifiersToConnectorId
-
-    return identifiersToConnectorId
+    self.connector_id_to_shelves = connectorIdToShelves
 end
 
 function GrimmorySynchronize:getConnectorBookId(connector, bookPath, bookMd5)
     local cacheValue = self.connector_id_cache:get(bookMd5:lower())
     if cacheValue ~= nil then
-        logger:dbg("Cache hit", bookMd5, bookPath)
+        logger:dbg("ID Cache hit", bookMd5, bookPath)
         if cacheValue < 0 then
             return nil
         end
@@ -113,7 +118,7 @@ function GrimmorySynchronize:getConnectorBookId(connector, bookPath, bookMd5)
         return cacheValue
     end
 
-    logger:dbg("Cache miss", bookMd5, bookPath)
+    logger:dbg("ID Cache miss", bookMd5, bookPath)
 
     local isbn = DocMetadata:getISBN(bookPath)
     local asin = DocMetadata:getASIN(bookPath)
@@ -124,7 +129,7 @@ function GrimmorySynchronize:getConnectorBookId(connector, bookPath, bookMd5)
 
     -- Instead of this, we should use a Grimmory search functionality.
     -- This works well enough for today, though.
-    local identifiers = self:getIdentifierMapping(connector)
+    local identifiers = self.identifiers_to_connector_id
 
     local titleId = self:getTitleIdentifier(title, author)
     local _, filename = util.splitFilePathName(bookPath)
@@ -345,8 +350,8 @@ function GrimmorySynchronize:synchronizeShelves(connector, callback)
 end
 
 function GrimmorySynchronize:synchronizeAll(connector, callback)
-    -- Reset so we pull fresh connector identifiers
-    self.identifiers_to_connector_id = nil
+    -- Refresh so we pull fresh books
+    self:refreshBooksFromConnector(connector)
 
     self:synchronizeShelves(connector, callback)
 
