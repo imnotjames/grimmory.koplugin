@@ -8,7 +8,7 @@ local InfoMessage = require("ui/widget/infomessage")
 local LuaSettings = require("luasettings")
 local MultiInputDialog = require("ui/widget/multiinputdialog")
 local UIManager = require("ui/uimanager")
-local Menu = require("ui/widget/menu")
+local PathChooser = require("ui/widget/pathchooser")
 
 local logger = require("namespaced_logger").new("GrimmorySettings")
 local GrimmoryConnector = require("connectors/grimmory_connector")
@@ -39,6 +39,7 @@ local DEFAULTS = {
     syncShelves = true,
     syncReadingSessions = true,
     targetShelves = {},
+    downloadDirectory = "grimmory/"
 }
 
 local function openSettingsHandle()
@@ -326,6 +327,28 @@ function GrimmorySettings:showSessionThresholdSettings()
 
     UIManager:show(self.settingsDialog)
     self.settingsDialog:onShowKeyboard()
+end
+
+function GrimmorySettings:showDownloadDirectorySettings()
+    self.settingsDialog = PathChooser:new({
+        title = "Download Directory",
+        select_file = false,
+        show_files = false,
+        path = self:getDownloadDirectory(),
+        onConfirm = function(newPath)
+            self:setDownloadDirectory(newPath)
+        end,
+    })
+
+    UIManager:show(self.settingsDialog)
+end
+
+function GrimmorySettings:getDownloadDirectory()
+    return self.data.downloadDirectory or DEFAULTS.downloadDirectory
+end
+
+function GrimmorySettings:setDownloadDirectory(downloadDirectory)
+    self:update({ downloadDirectory = downloadDirectory })
 end
 
 function GrimmorySettings:getBaseUri()

@@ -133,13 +133,19 @@ function Grimmory:addToMainMenu(menu_items)
                 },
             },
             {
-                text = _("Sync Shelves"),
+                text = _("Download Books"),
                 checked_func = function()
                     return self.settings:getSyncShelves()
                 end,
                 callback = function()
                     self.settings:toggleSyncShelves()
                     UIManager:broadcastEvent(Event:new("GrimmorySettingsChanged"))
+                end,
+            },
+            {
+                text = _("Set Download Directory"),
+                callback = function()
+                    self.settings:showDownloadDirectorySettings()
                 end,
             },
             {
@@ -248,6 +254,10 @@ function Grimmory:onGrimmorySettingsChanged()
     GrimmorySynchronize:setThresholds(
         self.settings:getSessionThresholdSeconds(),
         self.settings:getSessionThresholdPages()
+    )
+
+    GrimmorySynchronize:setDownloadDirectory(
+        self.settings:getDownloadDirectory()
     )
 
     GrimmorySynchronize:setTargetShelves(
@@ -433,8 +443,10 @@ function Grimmory:synchronize(verbose)
         UIManager:show(progressInfo)
     end
 
-    local count = 0
-    local errorCount = 0
+    local sessionCount = 0
+    local sessionErrorCount = 0
+    local bookCount = 0
+    local bookErrorCount = 0
 
     local ok, result = pcall(function()
         GrimmorySynchronize:synchronizeAll(
@@ -445,10 +457,14 @@ function Grimmory:synchronize(verbose)
                     self.settings:setSynchronizedUntil(progress.since)
                 end
 
-                if progress.state == "success" then
-                    count = count + 1
-                elseif progress.state == "error" then
-                    errorCount = errorCount + 1
+                if progress.state == "session-recorded" then
+                    sessionCount = sessionCount + 1
+                elseif progress.state == "session-error" then
+                    sessionErrorCount = sessionErrorCount + 1
+                elseif progress.state == "book-downloaded" then
+                    bookCount = bookCount + 1
+                elseif progress.state == "book-error" then
+                    bookErrorCount = bookErrorCount + 1
                 end
             end
         )
@@ -471,20 +487,26 @@ function Grimmory:synchronize(verbose)
 
     if verbose then
         local message
-        if errorCount > 0 then
-            message = _("Completed Grimmory sync\n%1 session(s) recorded\n%2 session(s) failed")
+        if sessionErrorCount > 0 or bookErrorCount > 0 then
+            message = T(
+                _("Completed Grimmory sync\n%1 session(s) recorded\n%2 session(s) failed\n%3 book(s) downloaded\n%4 book(s) failed"),
+                sessionCount,
+                sessionErrorCount,
+                bookCount,
+                bookErrorCount
+            )
         else
-            message = _("Completed Grimmory sync\n%1 session(s) recorded")
+            message = T(
+                _("Completed Grimmory sync\n%1 session(s) recorded\n%2 book(s) downloaded"),
+                sessionCount,
+                bookCount
+            )
         end
 
         UIManager:close(progressInfo)
         progressInfo = InfoMessage:new({
-            text = T(
-                message,
-                count,
-                errorCount
-            ),
-            timeout = 2
+            text = message,
+            timeout = 2,
         })
         UIManager:show(progressInfo)
     end

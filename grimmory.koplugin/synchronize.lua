@@ -13,14 +13,19 @@ local GrimmorySynchronize = {
     sync_shelves = true,
     sync_sessions = true,
     target_shelves = {},
+    download_directory = nil,
     md5_to_connector_id_cache = Cache:new({ slots = 4096 }),
     identifiers_to_connector_id = nil,
-    connector_id_to_shelves = nil,
+    connector_books = nil,
 }
 
 function GrimmorySynchronize:setThresholds(seconds, pages)
     self.threshold_seconds = seconds
     self.threshold_pages = pages
+end
+
+function GrimmorySynchronize:setDownloadDirectory(path)
+    self.download_directory = path
 end
 
 function GrimmorySynchronize:setTargetShelves(shelves)
@@ -56,12 +61,12 @@ end
 
 function GrimmorySynchronize:refreshBooksFromConnector(connector)
     local identifiersToConnectorId = {}
-    local connectorIdToShelves = {}
+    local connectorBooks = {}
 
     local ok, books = connector:getBooks()
 
     if not ok then
-        logger:err("Something went wrong feetching books", books)
+        logger:err("Something went wrong fetching books", books)
         return {}
     end
 
@@ -89,25 +94,51 @@ function GrimmorySynchronize:refreshBooksFromConnector(connector)
             end
         end
 
-        if book["primaryFile"] and book["primaryFile"]["filename"] then
-            identifiersToConnectorId["filename:" .. book["primaryFile"]["filename"]] = book.id
+        local fileName = nil
+        if book["primaryFile"] and book["primaryFile"]["fileName"] then
+            fileName = book["primaryFile"]["fileName"]
+            identifiersToConnectorId["filename:" .. fileName] = book.id
         end
 
-        -- Use a string for key for sparse tables
-        local shelves = {}
-        if book["shelves"] then
-            for _, shelf in ipairs(book["shelves"]) do
-                table.insert(shelves, shelf.id)
+        if fileName then
+            local shelves = {}
+
+            if book["shelves"] then
+                for _, shelf in ipairs(book["shelves"]) do
+                    table.insert(shelves, shelf.id)
+                end
+            end
+
+            local isMatchingShelf = false
+            for _, shelfId in ipairs(shelves) do
+                if self:isTargetShelf(shelfId) then
+                    isMatchingShelf = true
+                    break
+                end
+            end
+
+            if isMatchingShelf then
+                table.insert(
+                    connectorBooks,
+                    {
+                        id = book["id"],
+                        shelves = shelves,
+                        fileName = fileName
+                    }
+                )
             end
         end
-        connectorIdToShelves[tostring(book["id"])] = shelves
     end
 
     self.identifiers_to_connector_id = identifiersToConnectorId
-    self.connector_id_to_shelves = connectorIdToShelves
+    self.connector_books = connectorBooks
 end
 
 function GrimmorySynchronize:getConnectorBookId(connector, bookPath, bookMd5)
+    if bookMd5 == nil then
+        bookMd5 = util.partialMD5(bookPath)
+    end
+
     local cacheValue = self.md5_to_connector_id_cache:get(bookMd5:lower())
     if cacheValue ~= nil then
         logger:dbg("ID Cache hit", bookMd5, bookPath)
@@ -199,7 +230,7 @@ function GrimmorySynchronize:synchronizeSessions(connector, callback)
             if ok then
                 logger:info("Session recorded successfully for book", session.bookPath)
                 callback({
-                    state = "session-success",
+                    state = "session-recorded",
                     bookPath = session.bookPath,
                     since = session.startTime,
                 })
@@ -231,7 +262,7 @@ end
 
 function GrimmorySynchronize:synchronizeShelves(connector, callback)
     if not self.sync_shelves then
-        logger:info("Session sync skipped because feature is disabled")
+        logger:info("Shelf sync skipped because feature is disabled")
         return
     end
 
@@ -349,6 +380,122 @@ function GrimmorySynchronize:synchronizeShelves(connector, callback)
     ReadCollection:write()
 end
 
+function GrimmorySynchronize:downloadBook(connector, connectorId, downloadPath)
+    local success, result, message = pcall(function()
+        return connector:downloadBook(connectorId, downloadPath)
+    end)
+
+    if not success then
+        logger:err("Book download failed:", connectorId, " - ", result)
+        return false, result
+    end
+
+    if not result then
+        return false, message
+    end
+
+    return true, nil
+end
+
+function GrimmorySynchronize:getBookDownloadPath(connector, book)
+    local downloadPath = self.download_directory .. "/" .. util.getSafeFilename(book.fileName)
+
+    -- If this path doesn't exist yet, we're good, bail early
+    if not util.fileExists(downloadPath) then
+        return downloadPath
+    end
+
+    -- If the path exists we have to check to make sure that it is actually the book we care about
+    if self:getConnectorBookId(connector, downloadPath) == book.id then
+        -- We have a match, this path is safe.
+        return downloadPath
+    end
+
+    -- At this point we need a fallback name.  `download-${BOOK_ID}.${EXT}` is not
+    -- great but I don't know a better safe way off hand.
+
+     downloadPath = "downloaded-" .. tonumber(book.id) .. "." .. util.getFileNameSuffix(book.fileName)
+
+    -- If this path doesn't exist yet, we're good?
+    if not util.fileExists(downloadPath) then
+        return downloadPath
+    end
+    
+    -- Okay, this file exists.  It's GOT to be our file, though, right?
+    if self:getConnectorBookId(connector, downloadPath) == book.id then
+        -- We have a match, this path is safe.
+        return downloadPath
+    end
+
+    -- Give up.
+    logger:err("Could not determine a valid download path for book:", book.id)
+    return nil
+end
+
+function GrimmorySynchronize:synchronizeBooks(connector, callback)
+    if not self.sync_shelves then
+        logger:info("Book download skipped because feature is disabled")
+        return
+    end
+
+    if self.download_directory == nil then
+        logger:err("Book download skipped because download directory is not set")
+        return
+    end
+
+    -- Ensure that the download directory exists
+    local directoryExists, directoryErrorMessage = util.makePath(self.download_directory)
+    if not directoryExists then
+        logger:err("Failed to create download directory", directoryErrorMessage)
+        return
+    end
+
+    -- Eventually we should support a "since" but for right
+    -- now it's easiest to sync everything.
+    local books = self.connector_books or {}
+
+    -- TODO: Read known books from shelves in case we move the download directory
+
+    for _, book in ipairs(books) do
+        local bookExists = false
+
+        -- TODO: Search through known books from shelves for this book
+
+        local downloadPath = self:getBookDownloadPath(connector, book)
+
+        if util.fileExists(downloadPath) then
+            bookExists = true
+        end
+
+        if not bookExists and downloadPath ~= nil then
+            logger:dbg("Downloading book", book.id, "to", downloadPath)
+
+            local ok, message = self:downloadBook(connector, book.id, downloadPath)
+            if ok then
+                logger:info("Book downloaded:", book.id, " - ", downloadPath)
+                callback({
+                    state = "book-downloaded",
+                    bookId = book.id,
+                    downloadPath = downloadPath,
+                })
+            else
+                logger:err("Book failed download:", book.id, "-", message)
+                callback({
+                    state = "book-error",
+                    bookId = book.id,
+                    downloadPath = downloadPath,
+                })
+            end
+        else
+            callback({
+                state = "book-skipped",
+                bookId = book.id,
+                downloadPath = downloadPath,
+            })
+        end
+    end
+end
+
 function GrimmorySynchronize:synchronizeAll(connector, callback)
     -- Refresh so we pull fresh books
     self:refreshBooksFromConnector(connector)
@@ -357,7 +504,7 @@ function GrimmorySynchronize:synchronizeAll(connector, callback)
 
     self:synchronizeSessions(connector, callback)
 
-    logger:info("Book download not implemented yet")
+    self:synchronizeBooks(connector, callback)
 
     logger:info("Highlights not implemented yet")
 
