@@ -199,12 +199,14 @@ function GrimmoryConnector:getVersion()
 end
 
 function GrimmoryConnector:getBooks()
-    self:request(
+    local ok, _, payload = self:request(
         "GET",
-        "/api/v1/books",
+        "/api/v1/books?stripForListView=false",
         nil,
         self:__getAccessToken()
     )
+
+    return ok, payload or {}
 end
 
 function GrimmoryConnector:getShelves()
