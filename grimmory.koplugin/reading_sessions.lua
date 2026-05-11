@@ -1,7 +1,8 @@
+local Cache = require("cache")
 local SQ3 = require("lua-ljsqlite3/init")
 local DataStorage = require("datastorage")
-
-local ReaderUI = require("apps/reader/readerui")
+local ReadHistory = require("readhistory")
+local util = require("util")
 
 local logger = require("namespaced_logger").new("reading_sessions")
 
@@ -9,6 +10,8 @@ local SESSION_COLLAPSE_THRESHOLD = 60.0
 
 local ReadingSessions = {
     statistics_database_file =  DataStorage:getSettingsDir() .. "/statistics.sqlite3",
+    book_path_md5_cache = Cache:new({ slots = 2048 }),
+    last_book_md5_scan = 0,
 }
 
 function ReadingSessions.__open()
@@ -18,12 +21,24 @@ function ReadingSessions.__open()
     )
 end
 
+function ReadingSessions:getBookPath(targetMd5)
+    if not self.book_path_md5_cache:check(targetMd5) and self.last_book_md5_scan < os.time() + 10 then
+        self.last_book_md5_scan = os.time()
+        -- Look through every recent book and md5 them
+        for _, v in ipairs(ReadHistory.hist) do
+            local partialMd5 = util.partialMD5(v.file)
+            self.book_path_md5_cache:insert(partialMd5, v.file)
+        end
+    end
+
+    return self.book_path_md5_cache:get(targetMd5)
+end
+
 function ReadingSessions:getPageStatistics(since)
     local conn = ReadingSessions.__open()
 
     local stmt = conn:prepare([[
         SELECT
-            book.id,
             book.md5,
 
             p.start_time,
@@ -44,12 +59,12 @@ function ReadingSessions:getPageStatistics(since)
         table.insert(
             results,
             {
-                bookId = tonumber(row[1]),
-                bookMd5 = row[2],
-                startTime = tonumber(row[3]),
-                endTime = tonumber(row[4]),
-                page = tonumber(row[5]),
-                totalPages = tonumber(row[6])
+                bookMd5 = row[1],
+                bookPath = self:getBookPath(row[1]),
+                startTime = tonumber(row[2]),
+                endTime = tonumber(row[3]),
+                page = tonumber(row[4]),
+                totalPages = tonumber(row[5])
 
             }
         )
@@ -77,13 +92,20 @@ function ReadingSessions:getSessions(since)
         local collapsedSession = false
 
         if #sessions > 0 then
-            local lastBookId = sessions[#sessions].bookId
+            local lastBookMd5 = sessions[#sessions].bookMd5
             local lastEndTime = sessions[#sessions].endTime
             local lastProgress = sessions[#sessions].endProgress
             local lastPage = sessions[#sessions].endPage
+            local lastPageCount = sessions[#sessions].pageCount
 
-            if stat.bookId == lastBookId and math.abs(stat.startTime - lastEndTime) < SESSION_COLLAPSE_THRESHOLD then
-                logger:dbg("Collapsed session for book", stat.bookId)
+            if stat.bookMd5 ~= lastBookMd5 then
+                logger:dbg("Book changed, cannot collapse session:", lastBookMd5, "!=", stat.bookMd5)
+            elseif math.abs(stat.startTime - lastEndTime) > SESSION_COLLAPSE_THRESHOLD then
+                logger:dbg("Outside collapse session:", stat.bookId)
+            elseif stat.totalPages ~= lastPageCount then
+                logger:dbg("Page count changed, cannot combine sessions")
+            else
+                logger:dbg("Collapsed session for book", stat.bookMd5)
                 collapsedSession = true
                 sessions[#sessions].endTime = math.max(stat.endTime, lastEndTime)
                 sessions[#sessions].endProgress = math.max(progress, lastProgress)
@@ -92,20 +114,21 @@ function ReadingSessions:getSessions(since)
         end
 
         if not collapsedSession then
-            logger:dbg("New Session found for book", stat.bookId)
+            logger:dbg("New Session found for book", stat.bookMd5)
 
             -- If new session, create a new session record
             table.insert(
                 sessions,
                 {
-                    bookId = stat.bookId,
                     bookMd5 = stat.bookMd5,
+                    bookPath = stat.bookPath,
                     startTime = stat.startTime,
                     endTime = stat.endTime,
                     startProgress = progress,
                     endProgress = progress,
                     startPage = stat.page,
                     endPage = stat.page,
+                    pageCount = stat.totalPages,
                 }
             )
         end
@@ -114,7 +137,7 @@ function ReadingSessions:getSessions(since)
     table.sort(
         sessions,
         function (a, b)
-            return a.startTime - b.startTime
+            return a.endTime < b.endTime
         end
     )
 
