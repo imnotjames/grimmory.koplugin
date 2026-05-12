@@ -11,12 +11,9 @@ local PathChooser = require("ui/widget/pathchooser")
 local logger = require("grimmory/logger").new("GrimmorySettings")
 
 ---@class DialogManager
-local DialogManager = {
-    ---@type GrimmorySettings
-    settings = nil,
-    ---@type GrimmoryAPI
-    api = nil,
-}
+---@field settings GrimmorySettings
+---@field api GrimmoryAPI
+local DialogManager = {}
 DialogManager.__index = DialogManager
 
 function DialogManager:new(o)
