@@ -149,6 +149,14 @@ function GrimmoryMenu:addToMainMenu(menu_items)
 
                     return T(_("Source Shelves: %1"), targetDescription)
                 end,
+                enabled_func = function()
+                    if self.settings:getBaseUri() == "" then
+                        logger:info("BaseURI is not configured, cannot fetch shelves")
+                        return false
+                    end
+
+                    return true
+                end,
                 callback = function()
                     self.dialog_manager:showTargetShelvesSettings()
                 end,

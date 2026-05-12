@@ -113,6 +113,7 @@ function DialogManager:showTargetShelvesSettings()
 
     if not ok or type(result) == "string" then
         logger:err("Something went wrong loading shelves", result)
+        self:toast(T(_("Could not load shelves: %1"), result))
         return
     end
 
