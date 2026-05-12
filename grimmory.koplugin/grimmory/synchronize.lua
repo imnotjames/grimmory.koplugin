@@ -89,15 +89,15 @@ function GrimmorySynchronize:refreshBooksFromAPI()
                 end
             end
 
-            local isMatchingShelf = false
-            for _, shelfId in ipairs(shelves) do
-                if self:isTargetShelf(shelfId) then
-                    isMatchingShelf = true
+            local is_matching_shelf = false
+            for _, shelf_id in ipairs(shelves) do
+                if self:isTargetShelf(shelf_id) then
+                    is_matching_shelf = true
                     break
                 end
             end
 
-            if isMatchingShelf then
+            if is_matching_shelf then
                 table.insert(
                     books,
                     {
