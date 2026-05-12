@@ -10,11 +10,13 @@ local logger = require("grimmory/logger").new("GrimmorySynchronize")
 ---@field reading_sessions ReadingSessions
 ---@field settings GrimmorySettings
 ---@field api GrimmoryAPI
+---@field identifiers_to_book_id table<string, number>
+---@field cached_books Book[]
 local GrimmorySynchronize = {
     synchronize_sessions_since = 0,
     md5_to_book_id_cache = Cache:new({ slots = 4096 }),
-    identifiers_to_book_id = nil,
-    cached_books = nil,
+    identifiers_to_book_id = {},
+    cached_books = {},
 }
 GrimmorySynchronize.__index = GrimmorySynchronize
 
@@ -41,7 +43,11 @@ function GrimmorySynchronize:getTitleIdentifier(title, author)
 end
 
 function GrimmorySynchronize:refreshBooksFromAPI()
-    local identifiers_to_book_id = {}
+    ---@type table<string, number>
+    self.identifiers_to_book_id = {}
+
+    ---@type Book[]
+    self.cached_books = {}
 
     local ok, books = self.api:getBooks()
 
@@ -51,41 +57,41 @@ function GrimmorySynchronize:refreshBooksFromAPI()
     end
 
     for _, book in ipairs(books) do
-        local metadata = book["metadata"]
+        local metadata = book.metadata
 
         if metadata then
-            if metadata["asin"] then
-                identifiers_to_book_id["asin:" .. metadata["asin"]:lower()] = book.id
+            if metadata.asin then
+                self.identifiers_to_book_id["asin:" .. metadata.asin:lower()] = book.id
             end
 
-            if metadata["isbn13"] then
-                identifiers_to_book_id["isbn:" .. metadata["isbn13"]] = book.id
-            elseif metadata["isbn10"] then
-                identifiers_to_book_id["isbn:" .. metadata["isbn10"]] = book.id
+            if metadata.isbn13 then
+                self.identifiers_to_book_id["isbn:" .. metadata.isbn13] = book.id
+            elseif metadata.isbn10 then
+                self.identifiers_to_book_id["isbn:" .. metadata.isbn10] = book.id
             end
 
-            if metadata["title"] and metadata["authors"] then
-                local author = metadata["authors"][0] or metadata["authors"][1]
-                local titleIdentifier = self:getTitleIdentifier(metadata["title"], author)
+            if metadata.title and metadata.authors then
+                local author = metadata.authors[0] or metadata.authors[1]
+                local titleIdentifier = self:getTitleIdentifier(metadata.title, author)
 
                 if titleIdentifier then
-                    identifiers_to_book_id["title-id:" .. titleIdentifier] = book.id
+                    self.identifiers_to_book_id["title-id:" .. titleIdentifier] = book.id
                 end
             end
         end
 
         local filename = nil
-        if book["primaryFile"] and book["primaryFile"]["fileName"] then
-            filename = book["primaryFile"]["fileName"]
-            identifiers_to_book_id["filename:" .. filename] = book.id
+        if book.primary_file and book.primary_file.filename then
+            filename = book.primary_file.filename
+            self.identifiers_to_book_id["filename:" .. filename] = book.id
         end
 
         if filename then
             local shelves = {}
 
-            if book["shelves"] then
-                for _, shelf in ipairs(book["shelves"]) do
-                    table.insert(shelves, shelf.id)
+            if book.shelves then
+                for _, shelf_id in ipairs(book.shelves) do
+                    table.insert(shelves, shelf_id)
                 end
             end
 
@@ -98,20 +104,10 @@ function GrimmorySynchronize:refreshBooksFromAPI()
             end
 
             if is_matching_shelf then
-                table.insert(
-                    books,
-                    {
-                        id = book["id"],
-                        shelves = shelves,
-                        filename = filename
-                    }
-                )
+                table.insert(self.cached_books, book)
             end
         end
     end
-
-    self.identifiers_to_connector_id = identifiers_to_book_id
-    self.cached_books = books
 end
 
 function GrimmorySynchronize:getBookId(book_path, book_md5)
@@ -140,7 +136,7 @@ function GrimmorySynchronize:getBookId(book_path, book_md5)
 
     -- Instead of this, we should use a Grimmory search functionality.
     -- This works well enough for today, though.
-    local identifiers = self.identifiers_to_connector_id
+    local identifiers = self.identifiers_to_book_id
 
     local title_id = self:getTitleIdentifier(title, author)
     local _, filename = util.splitFilePathName(book_path)
@@ -168,7 +164,7 @@ end
 
 function GrimmorySynchronize:synchronizeSessions(callback)
     if not self.settings:getSyncReadingSessions() then
-        logger:info("Readin sessions sync skipped because feature is disabled")
+        logger:info("Reading sessions sync skipped because feature is disabled")
     end
 
     local since = self.settings:getSynchronizedUntil()
@@ -200,15 +196,15 @@ function GrimmorySynchronize:synchronizeSessions(callback)
                 session.end_progress
             )
 
-            local connectorBookId = self:getBookId(session.book_path, session.book_md5)
+            local book_id = self:getBookId(session.book_path, session.book_md5)
 
             local ok = false
             local body = nil
-            if connectorBookId == nil then
-                body = "Could not match local book to connector"
+            if book_id == nil then
+                body = "Could not match local book to Grimmory"
             else
                 ok, body = self.api:recordSession(
-                    connectorBookId,
+                    book_id,
                     session.start_time,
                     session.end_time,
                     session.start_progress,
@@ -260,7 +256,7 @@ function GrimmorySynchronize:synchronizeShelves(callback)
     local ok, shelves = self.api:getShelves()
 
     if not ok or type(shelves) == "string" then
-        logger:err("Could not connect to connector to get shelves", shelves)
+        logger:err("Could not connect to Grimmory to get shelves", shelves)
         return
     end
 
@@ -271,7 +267,7 @@ function GrimmorySynchronize:synchronizeShelves(callback)
         if shelf.id and shelf.name and self:isTargetShelf(shelf.id) then
             local shelf_name = shelf.name:lower()
 
-            logger:dbg("Shelf received from connector", shelf.id, shelf_name)
+            logger:dbg("Shelf received from Grimmory", shelf.id, shelf_name)
 
             -- If there's a shelf with a duplicate name, we can't support
             -- that in koreader.  Instead, add something to the shelf name
@@ -322,7 +318,7 @@ function GrimmorySynchronize:synchronizeShelves(callback)
                 -- Don't delete the shelf but break the connection.
                 ReadCollection.coll_settings[collection_name].connectorId = nil
 
-                -- Set the connector ID to nil so the block below will pick
+                -- Set the shelf ID to nil so the block below will pick
                 -- it up if it's a shelf being deleted and recreated
                 shelf_id = nil
 
@@ -395,7 +391,7 @@ function GrimmorySynchronize:getBookDownloadPath(book)
         return nil
     end
 
-    local download_path = download_directory .. "/" .. util.getSafeFilename(book.filename)
+    local download_path = download_directory .. "/" .. util.getSafeFilename(book.primary_file.filename)
 
     -- If this path doesn't exist yet, we're good, bail early
     if not util.fileExists(download_path) then
@@ -411,7 +407,11 @@ function GrimmorySynchronize:getBookDownloadPath(book)
     -- At this point we need a fallback name.  `download-${BOOK_ID}.${EXT}` is not
     -- great but I don't know a better safe way off hand.
 
-    local file_extension = util.getFileNameSuffix(book.filename) or "bin"
+    local file_extension = util.getFileNameSuffix(book.filename)
+
+    if file_extension == "" or file_extension == nil then
+        file_extension = "bin"
+    end
 
      download_path = download_directory .. "/downloaded-" .. tonumber(book.id) .. "." .. file_extension
 
@@ -483,7 +483,7 @@ function GrimmorySynchronize:synchronizeBooks(callback)
         -- TODO: Search through known books from shelves for this book
         --       If found, set the `download path to that value.
 
-        if util.fileExists(download_path) then
+        if download_path ~= nil and util.fileExists(download_path) then
             book_exists = true
         end
 
@@ -508,6 +508,7 @@ function GrimmorySynchronize:synchronizeBooks(callback)
                 })
             end
         else
+            logger:err("Book skipped as download path could not be found")
             callback({
                 state = "book-skipped",
                 book_id = book.id,

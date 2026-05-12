@@ -60,13 +60,21 @@ local function getAccessToken(api, base_uri, username, password)
 end
 
 ---@class BookMetadata
----@field isbn string
+---@field isbn13 string | nil
+---@field isbn10 string | nil
+---@field asin string | nil
+---@field title string | nil
+---@field authors string[] | nil
+
+---@class BookFile
+---@field filename string
 
 ---@class Book
 ---@field id number
 ---@field added_on number
 ---@field shelves number[]
 ---@field metadata BookMetadata
+---@field primary_file BookFile | nil
 
 local function parseBook(book)
     local shelves = {}
@@ -76,14 +84,30 @@ local function parseBook(book)
             table.insert(shelves, shelf.id)
         end
     end
+
+    ---@type BookMetadata
+    local metadata = {
+        isbn10 = book["metadata"]["isbn10"],
+        isbn13 = book["metadata"]["isbn13"],
+        asin = book["metadata"]["asin"],
+        title = book["metadata"]["title"],
+        authors = book["metadata"]["authors"],
+    }
+
+    local primary_file = nil
     
-    local metadata = {}
+    if book["primaryFile"] and book["primaryFile"]["fileName"] then
+        primary_file = {
+            filename = book["primaryFile"]["fileName"]
+        }
+    end
 
     return {
         id = book.id,
         added_on = fromISO8601(book["addedOn"]),
         shelves = shelves,
         metadata = metadata,
+        primary_file = primary_file
     }
 end
 
@@ -238,6 +262,8 @@ function GrimmoryAPI:testConnection(base_uri, username, password)
     return ok, body["current"]
 end
 
+---@return boolean ok
+---@return Book[] | string
 function GrimmoryAPI:getBooks()
     local ok, _, body = self:request(
         "GET",
@@ -250,12 +276,8 @@ function GrimmoryAPI:getBooks()
 
     local books = {}
 
-    for _, raw_book in ipairs(books) do
-        local book = parseBook(raw_book)
-
-        if book then
-            table.insert(books, book)
-        end
+    for _, raw_book in ipairs(body) do
+        table.insert(books, parseBook(raw_book))
     end
 
     return ok, books
