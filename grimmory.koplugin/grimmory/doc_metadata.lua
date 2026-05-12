@@ -1,10 +1,12 @@
 local DocSettings = require("docsettings")
 
 local DocMetadata = {}
-DocMetadata.__index = DocMetadata
 
 function DocMetadata:new(o)
-  return setmetatable(o, self)
+    o = o or {}
+    setmetatable(o, self)
+    self.__index = self
+    return o
 end
 
 function DocMetadata:getDocSettings(path)

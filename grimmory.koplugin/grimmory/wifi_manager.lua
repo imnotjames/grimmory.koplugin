@@ -4,10 +4,12 @@ local NetworkManager = require("ui/network/manager")
 local logger = require("grimmory/logger").new("WifiManager")
 
 local WifiManager = {}
-WifiManager.__index = WifiManager
 
 function WifiManager:new(o)
-  return setmetatable(o, self)
+    o = o or {}
+    setmetatable(o, self)
+    self.__index = self
+    return o
 end
 
 function WifiManager:isConnected()

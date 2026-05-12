@@ -33,7 +33,6 @@ local DEFAULTS = {
 local GrimmorySettings = {
     data = DEFAULTS,
 }
-GrimmorySettings.__index = GrimmorySettings
 
 local SETTING_KEY = "grimmory"
 
@@ -42,49 +41,57 @@ local function openSettingsHandle()
   return LuaSettings:open(path)
 end
 
-function GrimmorySettings:new()
-  local obj = setmetatable({}, self)
-  obj.settings = openSettingsHandle()
-  local success, result = pcall(function()
-    return obj.settings:readSetting(SETTING_KEY, {}) or {}
-  end)
-  if success then
-    obj.data = result
-  else
-    logger:err("Error reading settings, using defaults", result)
-    obj.data = {}
-  end
-  return obj
+function GrimmorySettings:new(o)
+    o = o or {}
+    setmetatable(o, self)
+    self.__index = self
+    o:init()
+    return o
+end
+
+function GrimmorySettings:init()
+    self.settings = openSettingsHandle()
+    local success, result = pcall(function()
+        return self.settings:readSetting(SETTING_KEY, {}) or {}
+    end)
+
+    if success then
+        self.data = result
+    else
+        logger:err("Error reading settings, using defaults", result)
+        self.data = {}
+    end
 end
 
 function GrimmorySettings:write()
-  local success, error_msg = pcall(function()
-    if not self.settings then
-      logger:err("No settings object available for write")
-      return false
+    local success, error_msg = pcall(function()
+        if not self.settings then
+            logger:err("No settings object available for write")
+            return false
+        end
+
+        logger:dbg("Saving settings data", self.data)
+        self.settings:saveSetting(SETTING_KEY, self.data)
+        self.settings:flush()
+        logger:dbg("Settings saved and flushed successfully")
+        return true
+    end)
+
+    if not success then
+        logger:err("Error writing settings:", error_msg)
+        return false
     end
 
-    logger:dbg("Saving settings data", self.data)
-    self.settings:saveSetting(SETTING_KEY, self.data)
-    self.settings:flush()
-    logger:dbg("Settings saved and flushed successfully")
     return true
-  end)
-
-  if not success then
-    logger:err("Error writing settings:", error_msg)
-    return false
-  end
-  return true
 end
 
 function GrimmorySettings:update(patch)
-  for k, v in pairs(patch or {}) do
-    logger:dbg("Updating setting:", k, "=", v)
-    self.data[k] = v
-  end
+    for k, v in pairs(patch or {}) do
+        logger:dbg("Updating setting:", k, "=", v)
+        self.data[k] = v
+    end
 
-  return self:write()
+    return self:write()
 end
 
 function GrimmorySettings:getDownloadDirectory()

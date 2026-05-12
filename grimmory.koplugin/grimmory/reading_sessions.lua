@@ -33,10 +33,12 @@ local ReadingSessions = {
     book_path_md5_cache = Cache:new({ slots = 2048 }),
     last_book_md5_scan = 0,
 }
-ReadingSessions.__index = ReadingSessions
 
 function ReadingSessions:new()
-  return setmetatable({}, self)
+    o = o or {}
+    setmetatable(o, self)
+    self.__index = self
+    return o
 end
 
 function ReadingSessions:withSessionDatabase(callback)

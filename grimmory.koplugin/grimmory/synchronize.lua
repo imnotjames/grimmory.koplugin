@@ -18,10 +18,12 @@ local GrimmorySynchronize = {
     identifiers_to_book_id = {},
     cached_books = {},
 }
-GrimmorySynchronize.__index = GrimmorySynchronize
 
 function GrimmorySynchronize:new(o)
-  return setmetatable(o, self)
+    o = o or {}
+    setmetatable(o, self)
+    self.__index = self
+    return o
 end
 
 function GrimmorySynchronize:getTitleIdentifier(title, author)

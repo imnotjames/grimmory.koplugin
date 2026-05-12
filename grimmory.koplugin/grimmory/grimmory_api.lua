@@ -120,12 +120,13 @@ local GrimmoryAPI = {
     version = Version:getCurrentRevision(),
     cached_access_token = nil,
 }
-GrimmoryAPI.__index = GrimmoryAPI
 
 function GrimmoryAPI:new(o)
-  local new_self = setmetatable(o, self)
-  new_self:init()
-  return new_self
+    o = o or {}
+    setmetatable(o, self)
+    self.__index = self
+    o:init()
+    return o
 end
 
 function GrimmoryAPI:init()

@@ -14,10 +14,12 @@ local logger = require("grimmory/logger").new("GrimmorySettings")
 ---@field settings GrimmorySettings
 ---@field api GrimmoryAPI
 local DialogManager = {}
-DialogManager.__index = DialogManager
 
 function DialogManager:new(o)
-  return setmetatable(o, self)
+    o = o or {}
+    setmetatable(o, self)
+    self.__index = self
+    return o
 end
 
 function DialogManager:toast(text, timeout)

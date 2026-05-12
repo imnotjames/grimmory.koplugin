@@ -6,16 +6,16 @@ local UIManager = require("ui/uimanager")
 
 local logger = require("grimmory/logger").new("GrimmoryMenu")
 
-local GrimmoryMenu = {
-    ---@type GrimmorySettings
-    settings = nil,
-    ---@type DialogManager
-    dialog_manager = nil,
-}
-GrimmoryMenu.__index = GrimmoryMenu
+---@class GrimmoryMenu
+---@field settings GrimmorySettings
+---@field dialog_manager DialogManager
+local GrimmoryMenu = {}
 
 function GrimmoryMenu:new(o)
-  return setmetatable(o, self)
+    o = o or {}
+    setmetatable(o, self)
+    self.__index = self
+    return o
 end
 
 function GrimmoryMenu:addToMainMenu(menu_items)
