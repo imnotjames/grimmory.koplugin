@@ -1,6 +1,8 @@
 local logger = require("logger")
 
-local NamespacedLogger = {}
+local NamespacedLogger = {
+    name = "Grimmory",
+}
 NamespacedLogger.__index = NamespacedLogger
 
 function NamespacedLogger.new(name)

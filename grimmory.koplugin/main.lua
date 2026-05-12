@@ -2,24 +2,31 @@ local _ = require("gettext")
 local T = require("ffi/util").template
 
 local Dispatcher = require("dispatcher")
-local Event = require("ui/event")
-local InfoMessage = require("ui/widget/infomessage")
-local NetworkManager = require("ui/network/manager")
-local Socket = require("socket")
 local UIManager = require("ui/uimanager")
 local WidgetContainer = require("ui/widget/container/widgetcontainer")
 
-local GrimmorySettings = require("settings")
-local GrimmoryConnector = require("connectors/grimmory_connector")
-local GrimmorySynchronize = require("synchronize")
+local GrimmoryDialogManager = require("grimmory/ui/dialog_manager")
+local GrimmoryMenu = require("grimmory/ui/menu")
+local GrimmoryWifiManager = require("grimmory/wifi_manager")
+local GrimmorySettings = require("grimmory/settings")
+local GrimmoryAPI = require("grimmory/grimmory_api")
+local GrimmorySynchronize = require("grimmory/synchronize")
+local GrimmoryScheduler = require("grimmory/scheduler")
+local GrimmoryReadingSessions = require("grimmory/reading_sessions")
 
-local logger = require("namespaced_logger").new("Grimmory")
+local logger = require("grimmory/logger").new("Grimmory")
 
 local Grimmory = WidgetContainer:extend{
     name = "grimmory",
     is_doc_only = false,
     is_stub = false,
-    last_periodic_sync = nil,
+    periodic_sync_cancel = nil,
+    periodic_sync_update = nil,
+    wifi_manager = nil,
+    dialog_manager = nil,
+    scheduler = nil,
+    menu = nil,
+    synchronizer = nil,
 }
 
 function Grimmory:onDispatcherRegisterActions()
@@ -38,166 +45,39 @@ function Grimmory:onDispatcherRegisterActions()
   })
 end
 
-function Grimmory:addToMainMenu(menu_items)
-    menu_items.grimmory = {
-        text = "Grimmory",
-        sorting_hint = "tools",
-        sub_item_table = {
-            {
-                text = _("Force Sync Now"),
-                enabled_func = function()
-                    return self:isReadyToSync()
-                end,
-                callback = function()
-                    -- Do not block the UI thread
-                    UIManager:scheduleIn(0.1, function()
-                        self:synchronize(true)
-                    end)
-                end,
-                separator = true,
-            },
-            {
-                text = _("Connection Settings"),
-                callback = function()
-                    self.settings:showConnectionSettings()
-                end,
-            },
-            {
-                text = _("Automatic Sync"),
-                separator = true,
-                sub_item_table = {
-                    {
-                        text = _("On Close Document"),
-                        checked_func = function()
-                            return self.settings:getSyncOnCloseDocument()
-                        end,
-                        callback = function()
-                            self.settings:toggleSyncOnCloseDocument()
-                            UIManager:broadcastEvent(Event:new("GrimmorySettingsChanged"))
-                        end,
-                        keep_menu_open = true,
-                    },
-                    {
-                        text = _("On Suspend"),
-                        checked_func = function()
-                            return self.settings:getSyncOnSuspend()
-                        end,
-                        callback = function()
-                            self.settings:toggleSyncOnSuspend()
-                            UIManager:broadcastEvent(Event:new("GrimmorySettingsChanged"))
-                        end,
-                        keep_menu_open = true,
-                    },
-                    {
-                        text = _("On Power Off"),
-                        checked_func = function()
-                            return self.settings:getSyncOnPowerOff()
-                        end,
-                        callback = function()
-                            self.settings:toggleSyncOnPowerOff()
-                            UIManager:broadcastEvent(Event:new("GrimmorySettingsChanged"))
-                        end,
-                        keep_menu_open = true,
-                        separator = true,
-                    },
-                    {
-                        text = _("Periodically Sync"),
-                        checked_func = function()
-                            return self.settings:getSyncPeriodically()
-                        end,
-                        callback = function()
-                            self.settings:toggleSyncPeriodically()
-                            self:onGrimmorySettingsChanged()
-                        end,
-                        keep_menu_open = true,
-                    },
-                    {
-                        text_func = function()
-                            local frequency = self.settings:getSyncFrequency()
-                            return T(_("Frequency: %1 minutes"), frequency)
-                        end,
-                        callback = function()
-                            self.settings:showSyncFrequencySettings()
-                        end,
-                        separator = true,
-                    },
-                    {
-                        text = _("Enable WiFi"),
-                        checked_func = function()
-                            return self.settings:getSyncEnableWifi()
-                        end,
-                        callback = function()
-                            self.settings:toggleSyncEnableWifi()
-                            UIManager:broadcastEvent(Event:new("GrimmorySettingsChanged"))
-                        end,
-                    },
-                },
-            },
-            {
-                text = _("Download Books"),
-                checked_func = function()
-                    return self.settings:getSyncShelves()
-                end,
-                callback = function()
-                    self.settings:toggleSyncShelves()
-                    UIManager:broadcastEvent(Event:new("GrimmorySettingsChanged"))
-                end,
-            },
-            {
-                text = _("Set Download Directory"),
-                callback = function()
-                    self.settings:showDownloadDirectorySettings()
-                end,
-            },
-            {
-                text_func = function()
-                    local targetDescription = "All"
-
-                    local targetShelves = self.settings:getTargetShelves()
-
-                    local count = 0
-                    for _, shelf in ipairs(targetShelves) do
-                        if count == 0 then
-                            targetDescription = shelf.name
-                        else
-                            targetDescription = targetShelves .. ", " .. shelf.name
-                        end
-                        count = count + 1
-                    end
-
-                    return T(_("Source Shelves: %1"), targetDescription)
-                end,
-                callback = function()
-                    self.settings:showTargetShelvesSettings()
-                end,
-                separator = true,
-            },
-            {
-                text = _("Sync Reading Sessions"),
-                checked_func = function()
-                    return self.settings:getSyncReadingSessions()
-                end,
-                callback = function()
-                    self.settings:toggleSyncReadingSessions()
-                    UIManager:broadcastEvent(Event:new("GrimmorySettingsChanged"))
-                end,
-            },
-            {
-                text = _("Reading Session Thresholds"),
-                callback = function()
-                    self.settings:showSessionThresholdSettings()
-                end,
-            },
-        }
-    }
-end
-
 function Grimmory:init()
+    self.scheduler = GrimmoryScheduler:new()
     self.settings = GrimmorySettings:new()
+
+    self.reading_sessions = GrimmoryReadingSessions:new()
+
+    self.api = GrimmoryAPI:new({
+        settings = self.settings
+    })
+
+    self.dialog_manager = GrimmoryDialogManager:new({
+        settings = self.settings,
+        api = self.api,
+    })
+
+    self.wifi_manager = GrimmoryWifiManager:new({
+        settings = self.settings
+    })
+
+    self.menu = GrimmoryMenu:new({
+        settings = self.settings,
+        dialog_manager = self.dialog_manager,
+    })
+
+    self.synchronizer = GrimmorySynchronize:new({
+        settings = self.settings,
+        reading_sessions = self.reading_sessions,
+        api = self.api,
+    })
 
     self:onGrimmorySettingsChanged()
 
-    self.ui.menu:registerToMainMenu(self)
+    self.ui.menu:registerToMainMenu(self.menu)
 
     self:onDispatcherRegisterActions()
 
@@ -206,13 +86,15 @@ end
 
 function Grimmory:onExit()
     logger:dbg("Exiting")
+
+    self.scheduler:clear()
 end
 
 function Grimmory:onSuspend()
     logger:dbg("Device is suspending")
 
     if self.settings:getSyncOnSuspend() then
-       self:synchronizeOnEvent()
+       self:onGrimmorySync()
     end
 end
 
@@ -220,7 +102,7 @@ function Grimmory:onPowerOff()
     logger:dbg("Device is powering off")
 
     if self.settings:getSyncOnPowerOff() then
-       self:synchronizeOnEvent()
+       self:onGrimmorySync()
     end
 end
 
@@ -233,108 +115,52 @@ function Grimmory:onCloseDocument()
 
     if self.settings:getSyncOnCloseDocument() then
         -- Do not block the UI thread
-        UIManager:scheduleIn(0.1, function()
-            self:synchronizeOnEvent()
+        UIManager:nextTick(function()
+            self:onGrimmorySync()
         end)
     end
 end
 
-function Grimmory:onGrimmorySync()
-    local ok, result = pcall(function()
-        self:synchronize(false)
-    end)
-
-    if not ok then
-        logger:warn("Error when synchronizing:", result)
-    end
-end
-
 function Grimmory:onGrimmorySettingsChanged()
-    logger:info("Settings Changes")
+    logger:dbg("Settings Changed")
 
-    GrimmorySynchronize:setThresholds(
-        self.settings:getSessionThresholdSeconds(),
-        self.settings:getSessionThresholdPages()
-    )
+    self:onSchedulePeriodicPush()
+end
 
-    GrimmorySynchronize:setDownloadDirectory(
-        self.settings:getDownloadDirectory()
-    )
-
-    GrimmorySynchronize:setTargetShelves(
-        self.settings:getTargetShelves()
-    )
-
-    GrimmorySynchronize:setFeaturesEnabled(
-        self.settings:getSyncShelves(),
-        self.settings:getSyncReadingSessions()
-    )
-
-    GrimmorySynchronize:setSynchronizeSessionsSince(
-        self.settings:getSynchronizedUntil()
-    )
-
-    GrimmoryConnector:setCredentials(
-        self.settings:getBaseUri(),
-        self.settings:getUsername(),
-        self.settings:getPassword()
-    )
-
+function Grimmory:onSchedulePeriodicPush()
     if self.settings:getSyncPeriodically() then
-        self:schedulePeriodicPush()
+        -- If we want to sync we need to either update
+        -- and existing schedule if we already scheduled
+
+        local frequency_seconds = self.settings:getSyncFrequency() * 60
+
+        if self.periodic_sync_update then
+            -- We already have an interval set up, so we should update
+            -- it with a new frequency
+            self.periodic_sync_update(frequency_seconds)
+        else
+            -- We don't have an existing sync update helper so we need
+            -- to schedule a new interval.
+            local cancel, update = self.scheduler:interval(
+                frequency_seconds,
+                function()
+                    self:onGrimmorySync()
+                end
+            )
+
+            self.periodic_sync_cancel = cancel
+            self.periodic_sync_update = update
+        end
     else
-        self:unschedulePeriodicPush()
+        -- We don't want to sync anymore so we need to cancel
+        -- if it's defined and clean up the cancel / update props
+        if self.periodic_sync_cancel then
+            self.periodic_sync_cancel()
+        end
+
+        self.periodic_sync_cancel = nil
+        self.periodic_sync_update = nil
     end
-end
-
-function Grimmory:unschedulePeriodicPush()
-    logger:dbg("Unscheduling periodic sync")
-
-    self.last_periodic_sync = nil
-    UIManager:unschedule(self.onGrimmorySyncPeriodically)
-end
-
-function Grimmory:schedulePeriodicPush()
-    local minutesToNextSync = self.settings:getSyncFrequency()
-
-    if self.last_periodic_sync ~= nil then
-        local minutesSinceLastSync = (os.time() - self.last_periodic_sync) / 60
-
-        minutesToNextSync = minutesToNextSync - minutesSinceLastSync
-        minutesToNextSync = math.max(0, minutesToNextSync)
-    else
-        -- If a periodic sync has never been done before we set to right now
-        self.last_periodic_sync = os.time()
-    end
-
-    logger:info("Scheduling next sync in", minutesToNextSync, "minutes")
-
-    UIManager:unschedule(self.onGrimmorySyncPeriodically)
-    UIManager:scheduleIn(minutesToNextSync * 60, self.onGrimmorySyncPeriodically, self)
-end
-
-function Grimmory:onGrimmorySyncPeriodically()
-    logger:info("Periodic Sync starting")
-
-    -- Schedule the next periodic sync
-    self.last_periodic_sync = os.time()
-    self:schedulePeriodicPush()
-
-    -- Run the synchronization
-    self:synchronizeOnEvent()
-end
-
-function Grimmory:isWifiOn()
-    local ok, result = pcall(function()
-        return NetworkManager:isWifiOn()
-    end)
-
-    if not ok then
-        logger:err("Something went wrong checking wifi state", result)
-        return true
-    end
-
-    return result
 end
 
 function Grimmory:isReadyToSync()
@@ -346,170 +172,92 @@ function Grimmory:isReadyToSync()
     return true
 end
 
-function Grimmory:isConnected()
-    if not self:isWifiOn() then
+function Grimmory:onGrimmorySync(verbose)
+    if not self:isReadyToSync() then
         return false
     end
 
-    local ok, result = pcall(function()
-        return NetworkManager:isConnected()
-    end)
-
-    if not ok then
-        logger:err("Something went wrong checking wifi connectivity", result)
-        return true
-    end
-
-    return result
-end
-
-function Grimmory:enableWifi()
-    logger:info("Enabling wifi")
-
-    local ok, result = pcall(function()
-        NetworkManager.turnOnWifi()
-
-        -- Wait for 10 seconds for connectivity to come up
-        local endTime = os.time() + 30
-        while os.time() < endTime do
-            if NetworkManager:isConnected() then
-                logger:info("Connected!")
-                return
-            end
-            -- Sleep for a little bit so we don't make a busy loop
-            Socket.select(nil, nil, 0.25)
+    local function sync_callback()
+        if not self.wifi_manager:isConnected() then
+            logger:err("Cannot sync without connectivity")
+            return
         end
 
-        logger:info("Timeout attempting to connect")
-    end)
-
-    if not ok then
-        logger:err("Unable to turn on wifi", result)
-    end
-end
-
-function Grimmory:disableWifi()
-    logger:info("Disabling wifi")
-    local ok, result = pcall(function()
-        return NetworkManager.turnOffWifi()
-    end)
-
-    if not ok then
-        logger:err("Unable to turn off wifi", result)
-    end
-end
-
-function Grimmory:synchronizeOnEvent()
-    if not self:isReadyToSync() then
-        logger:info("Not ready to sync, skipping on event")
-        return false
-    end
-
-    local wifiNeedsDisable = false
-    if self.settings:getSyncEnableWifi() and not self:isWifiOn() then
-        wifiNeedsDisable = true
-        self:enableWifi()
-    end
-
-    if not self:isConnected() then
-        logger:info("Cannot sync without connectivity")
-        return
-    end
-
-    -- In the future, we should limit what we sync
-    -- to current or recent books.  For now, we sync everything.
-    local ok, result = pcall(function()
-        self:synchronize(false)
-    end)
-
-    if not ok then
-        logger:warn("Error when synchronizing:", result)
-    end
-
-    if wifiNeedsDisable then
-        self:disableWifi()
-    end
-end
-
-function Grimmory:synchronize(verbose)
-    logger:info("Synchronizing to Grimmory")
-
-    local progressInfo
-
-    if verbose then
-        progressInfo = InfoMessage:new({
-            text = _("Starting Grimmory sync..."),
-            timeout = 1
-        })
-        UIManager:show(progressInfo)
-    end
-
-    local sessionCount = 0
-    local sessionErrorCount = 0
-    local bookCount = 0
-    local bookErrorCount = 0
-
-    local ok, result = pcall(function()
-        GrimmorySynchronize:synchronizeAll(
-            GrimmoryConnector,
-            function(progress)
-                if progress.since then
-                    -- Update since
-                    self.settings:setSynchronizedUntil(progress.since)
-                end
-
-                if progress.state == "session-recorded" then
-                    sessionCount = sessionCount + 1
-                elseif progress.state == "session-error" then
-                    sessionErrorCount = sessionErrorCount + 1
-                elseif progress.state == "book-downloaded" then
-                    bookCount = bookCount + 1
-                elseif progress.state == "book-error" then
-                    bookErrorCount = bookErrorCount + 1
-                end
-            end
-        )
-    end)
-
-    if not ok then
-        logger:err("Failed sync", result)
+        logger:info("Synchronizing to Grimmory")
 
         if verbose then
-            UIManager:close(progressInfo)
-            progressInfo = InfoMessage:new({
-                text = T(_("Failed to Synchronize to Grimmory")),
-                timeout = 2,
-            })
-            UIManager:show(progressInfo)
+            self.dialog_manager:toast(
+                _("Starting Grimmory sync...")
+            )
         end
 
-        return
+        local sessionCount = 0
+        local sessionErrorCount = 0
+        local bookCount = 0
+        local bookErrorCount = 0
+
+        -- In the future, we should limit what we sync
+        -- to current or recent books.  For now, we sync everything.
+
+        local ok, result = pcall(function()
+            self.synchronizer:synchronizeAll(
+                function(progress)
+                    if progress.since then
+                        -- Update since
+                        self.settings:setSynchronizedUntil(progress.since)
+                    end
+
+                    if progress.state == "session-recorded" then
+                        sessionCount = sessionCount + 1
+                    elseif progress.state == "session-error" then
+                        sessionErrorCount = sessionErrorCount + 1
+                    elseif progress.state == "book-downloaded" then
+                        bookCount = bookCount + 1
+                    elseif progress.state == "book-error" then
+                        bookErrorCount = bookErrorCount + 1
+                    end
+                end
+            )
+        end)
+
+        if not ok then
+            logger:err("Failed sync", result)
+
+            if verbose then
+                self.dialog_manager:toast(
+                    T(_("Failed to Synchronize to Grimmory"))
+                )
+            end
+
+            return
+        end
+
+        if verbose then
+            local message
+            if sessionErrorCount > 0 or bookErrorCount > 0 then
+                message = T(
+                    _("Completed Grimmory sync\n%1 session(s) recorded\n%2 session(s) failed\n%3 book(s) downloaded\n%4 book(s) failed"),
+                    sessionCount,
+                    sessionErrorCount,
+                    bookCount,
+                    bookErrorCount
+                )
+            else
+                message = T(
+                    _("Completed Grimmory sync\n%1 session(s) recorded\n%2 book(s) downloaded"),
+                    sessionCount,
+                    bookCount
+                )
+            end
+
+            self.dialog_manager:toast(message)
+        end
     end
 
-    if verbose then
-        local message
-        if sessionErrorCount > 0 or bookErrorCount > 0 then
-            message = T(
-                _("Completed Grimmory sync\n%1 session(s) recorded\n%2 session(s) failed\n%3 book(s) downloaded\n%4 book(s) failed"),
-                sessionCount,
-                sessionErrorCount,
-                bookCount,
-                bookErrorCount
-            )
-        else
-            message = T(
-                _("Completed Grimmory sync\n%1 session(s) recorded\n%2 book(s) downloaded"),
-                sessionCount,
-                bookCount
-            )
-        end
-
-        UIManager:close(progressInfo)
-        progressInfo = InfoMessage:new({
-            text = message,
-            timeout = 2,
-        })
-        UIManager:show(progressInfo)
+    if self.settings:getSyncEnableWifi() then
+        self.wifi_manager:withWifi(sync_callback)
+    else
+        UIManager:nextTick(sync_callback)
     end
 end
 
