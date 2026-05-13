@@ -1,0 +1,47 @@
+name: On Release Draft
+
+on:
+  release:
+    types:
+      - published
+
+jobs:
+  attach-archive:
+    name: 
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: write
+      packages: write
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+        with:
+          fetch-depth: 1
+          ref: ${{ github.sha }}
+      - name: Update `_meta`
+        env:
+          VERSION: ${{ github.event.release.tag_name }}
+          REPOSITORY: ${{ github.repository }}
+        run: |
+          set -ex
+
+          sed 's~\(version = \)".\+"~\1"'${VERSION//v}'"~' -i grimmory.koplugin/_meta.lua
+          sed 's~\(repository = \)".\+"~\1"'$REPOSITORY'"~' -i grimmory.koplugin/_meta.lua
+      - name: Create archive
+        run: |
+          set -ex
+
+          zip -r grimmory.koplugin.zip ./grimmory.koplugin/ ./README.md ./LICENSE
+      - name: Upload Artifact
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: grimmory.koplugin.zip
+          path: grimmory.koplugin.zip
+          retention-days: 30
+      - name: Attach Artifact to GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ github.event.release.tag_name }}
+        run: gh release upload "$RELEASE_TAG" grimmory.koplugin.zip --clobber
