@@ -33,6 +33,8 @@ function DialogManager:toast(text, timeout)
 
     if timeout == nil then
         timeout = 2
+    elseif timeout <= 0 then
+        timeout = nil
     end
 
     self.info_message = InfoMessage:new({
@@ -349,7 +351,7 @@ function DialogManager:showPluginUpdater()
                 elseif state == "failed" then
                     UIManager:close(dialog)
 
-                    self:toast(T(_("Failed to update\n%1"), message))
+                    self:toast(T(_("Failed to update\n%1"), message), 0)
                 end
             end
         )
