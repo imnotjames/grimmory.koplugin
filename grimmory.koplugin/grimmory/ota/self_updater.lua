@@ -92,7 +92,6 @@ end
 ---@field repository string
 ---@field latest_known_version string | nil
 ---@field is_pending_restart boolean
----@field cancel_automatic_updates function
 local GrimmorySelfUpdater = {
     plugin_path = getPluginPath(),
     release_asset_name = "%a+.koplugin.zip",
@@ -103,21 +102,7 @@ function GrimmorySelfUpdater:new(o)
     o = o or {}
     setmetatable(o, self)
     self.__index = self
-    o:init()
     return o
-end
-
-function GrimmorySelfUpdater:init()
-    -- If automatic updates is enabled, schedule interval.
-    if self.settings:getAutomaticCheckUpdates() then
-        self.cancel_automatic_updates = self.scheduler:interval(
-            AUTOMATIC_UPDATE_SECONDS,
-            self.fetchLatestVersion,
-            self
-        )
-
-        self:fetchLatestVersion()
-    end
 end
 
 function GrimmorySelfUpdater:isPendingRestart()

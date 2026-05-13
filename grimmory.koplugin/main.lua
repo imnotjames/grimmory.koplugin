@@ -25,6 +25,7 @@ local Grimmory = WidgetContainer:extend{
     is_stub = false,
     periodic_sync_cancel = nil,
     periodic_sync_update = nil,
+    release_check_cancel = nil,
     wifi_manager = nil,
     dialog_manager = nil,
     scheduler = nil,
@@ -136,6 +137,7 @@ function Grimmory:onGrimmorySettingsChanged()
     logger:dbg("Settings Changed")
 
     self:onSchedulePeriodicPush()
+    self:onScheduleAutomaticUpdates()
 end
 
 function Grimmory:onSchedulePeriodicPush()
@@ -171,6 +173,33 @@ function Grimmory:onSchedulePeriodicPush()
 
         self.periodic_sync_cancel = nil
         self.periodic_sync_update = nil
+    end
+end
+
+function Grimmory:onScheduleAutomaticUpdates()
+    -- If automatic updates is enabled, schedule interval.
+    if self.settings:getAutomaticCheckUpdates() then
+        if not self.release_check_cancel then
+            local cancel, _ = self.scheduler:interval(
+                7200,
+                self.updater.fetchLatestVersion,
+                self.updater
+            )
+
+            self.release_check_cancel = cancel
+        end
+
+        self.scheduler:schedule(
+            5,
+            self.updater.fetchLatestVersion,
+            self.updater
+        )
+    else
+        if self.release_check_cancel then
+            self.release_check_cancel()
+        end
+
+        self.release_check_cancel = nil
     end
 end
 
