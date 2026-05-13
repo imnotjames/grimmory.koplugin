@@ -495,33 +495,35 @@ function GrimmorySynchronize:synchronizeBooks(callback)
             book_exists = true
         end
 
-        if not book_exists and download_path ~= nil then
-            logger:info("Downloading book", book.id, "to", download_path)
+        if not book_exists then
+            if not download_path ~= nil then
+                logger:info("Downloading book", book.id, "to", download_path)
 
-            local ok, message = self:downloadBook(book.id, download_path)
-            if ok then
-                logger:info("Book downloaded:", book.id, " - ", download_path)
-                callback({
-                    state = "book-downloaded",
-                    book_id = book.id,
-                    download_path = download_path,
-                })
-                book_exists = true
+                local ok, message = self:downloadBook(book.id, download_path)
+                if ok then
+                    logger:info("Book downloaded:", book.id, " - ", download_path)
+                    callback({
+                        state = "book-downloaded",
+                        book_id = book.id,
+                        download_path = download_path,
+                    })
+                    book_exists = true
+                else
+                    logger:err("Book failed download:", book.id, "-", message)
+                    callback({
+                        state = "book-error",
+                        book_id = book.id,
+                        download_path = download_path,
+                    })
+                end
             else
-                logger:err("Book failed download:", book.id, "-", message)
+                logger:err("Book skipped as download path could not be found")
                 callback({
-                    state = "book-error",
+                    state = "book-skipped",
                     book_id = book.id,
                     download_path = download_path,
                 })
             end
-        else
-            logger:err("Book skipped as download path could not be found")
-            callback({
-                state = "book-skipped",
-                book_id = book.id,
-                download_path = download_path,
-            })
         end
 
         if book_exists then
