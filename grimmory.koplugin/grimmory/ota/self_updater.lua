@@ -110,7 +110,7 @@ function GrimmorySelfUpdater:isPendingRestart()
 end
 
 function GrimmorySelfUpdater:isUpdateAvailable()
-    local current_version = PluginMetadata.version
+    local current_version = "v" .. PluginMetadata.version
     local latest_version = self.latest_known_version or current_version
 
     return isVersionLater(current_version, latest_version)
@@ -118,7 +118,7 @@ end
 
 function GrimmorySelfUpdater:getLatestReleaseVersion()
     -- Get the latest release version from github
-    local current_version = PluginMetadata.version
+    local current_version = "v" .. PluginMetadata.version
     return self.latest_known_version or current_version
 end
 
