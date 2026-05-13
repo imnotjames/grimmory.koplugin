@@ -2,8 +2,8 @@ local http = require("socket.http")
 local https = require("ssl.https")
 local json = require("json")
 local ltn12 = require("ltn12")
-local Device = require("device")
-local Version = require("version")
+
+local PluginMetadata = require("_meta")
 
 local logger = require("grimmory/logger").new("GrimmoryAPI")
 
@@ -115,9 +115,6 @@ end
 local GrimmoryAPI = {
     ---@type GrimmorySettings
     settings = nil,
-    id = "KOReader",
-    model = Device.model,
-    version = Version:getCurrentRevision(),
     cached_access_token = nil,
 }
 
@@ -140,8 +137,14 @@ function GrimmoryAPI:getUri(path)
     return base_uri .. path
 end
 
+function GrimmoryAPI:getUserAgent()
+    return "grimmory.koplugin/" .. PluginMetadata.version .. " (" .. PluginMetadata.repository .. ")"
+end
+
 function GrimmoryAPI:rawRequest(method, uri, data, headers, sink)
     headers = headers or {}
+
+    headers["User-Agent"] = self:getUserAgent()
 
     local client
     if uri:match("^http:") then
