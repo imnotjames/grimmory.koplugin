@@ -7,12 +7,14 @@ local InfoMessage = require("ui/widget/infomessage")
 local MultiInputDialog = require("ui/widget/multiinputdialog")
 local UIManager = require("ui/uimanager")
 local PathChooser = require("ui/widget/pathchooser")
+local ProgressbarDialog = require("ui/widget/progressbardialog")
 
 local logger = require("grimmory/logger").new("GrimmorySettings")
 
 ---@class DialogManager
 ---@field settings GrimmorySettings
 ---@field api GrimmoryAPI
+---@field updater GrimmorySelfUpdater
 local DialogManager = {}
 
 function DialogManager:new(o)
@@ -275,5 +277,83 @@ function DialogManager:showDownloadDirectorySettings()
 
     UIManager:show(self.dialog)
 end
+
+function DialogManager:showPluginUpdateCheck()
+    local latest_version = self.updater:getLatestReleaseVersion()
+    local is_update_available = self.updater:isUpdateAvailable()
+
+    local update_button_text = _("No update available")
+
+    if is_update_available then
+        update_button_text = T(_("Update to %1"), latest_version)
+    end
+
+    self.dialog = ButtonDialog:new({
+        title = T(_("Update Grimmory Plugin\nLatest release is %1"), latest_version),
+        buttons = {
+            {
+                {
+                    text = update_button_text,
+                    callback = function()
+                        if is_update_available then
+                            UIManager:close(self.dialog)
+
+                            self:showPluginUpdater()
+                        end
+                    end,
+                },
+                {
+                    text = _("Check for Updates"),
+                    callback = function()
+                        self.updater:fetchLatestVersion()
+                        UIManager:close(self.dialog)
+                        self:showPluginUpdateCheck()
+                    end,
+                },
+            },
+            {
+                {
+                    text = _("Close"),
+                    callback = function()
+                        UIManager:close(self.dialog)
+                    end,
+                },
+            },
+        },
+    })
+
+    UIManager:show(self.dialog)
+end
+
+function DialogManager:showPluginUpdater()
+    local dialog = ProgressbarDialog:new({
+        title = _("Updating Grimmory Plugin"),
+        progress_max = 100,
+        refresh_time_seconds = 3,
+        dismissable = false,
+    })
+
+    UIManager:show(dialog)
+
+    UIManager:nextTick(function()
+        self.updater:update(
+            function(state, progress, message)
+                dialog:reportProgress(progress)
+
+                if state == "complete" then
+                    UIManager:close(dialog)
+
+                    UIManager:askForRestart(_("Grimmory plugin update will apply on next Restart."))
+                elseif state == "failed" then
+                    UIManager:close(dialog)
+
+                    self:toast(T(_("Failed to update\n%1"), message))
+                end
+            end
+        )
+    end)
+end
+
+
 
 return DialogManager

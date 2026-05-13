@@ -4,11 +4,14 @@ local T = require("ffi/util").template
 local Event = require("ui/event")
 local UIManager = require("ui/uimanager")
 
+local PluginMetadata = require("_meta")
+
 local logger = require("grimmory/logger").new("GrimmoryMenu")
 
 ---@class GrimmoryMenu
 ---@field settings GrimmorySettings
 ---@field dialog_manager DialogManager
+---@field updater GrimmorySelfUpdater
 local GrimmoryMenu = {}
 
 function GrimmoryMenu:new(o)
@@ -16,6 +19,57 @@ function GrimmoryMenu:new(o)
     setmetatable(o, self)
     self.__index = self
     return o
+end
+
+function GrimmoryMenu:getAboutMenu()
+    -- These won't change after the plugin starts up
+    local repository = PluginMetadata.repository
+    local version = PluginMetadata.version
+
+    return {
+        {
+            text = repository,
+            keep_menu_open = true,
+        },
+        {
+            text = T(_("Version %1"), version),
+            keep_menu_open = true,
+            separator = true,
+        },
+        {
+            text_func = function()
+                return _("Automatically Check for Updates")
+            end,
+            checked_func = function()
+                return self.settings:getAutomaticCheckUpdates()
+            end,
+            callback = function()
+                self.settings:toggleAutomaticCheckUpdates()
+            end,
+            keep_menu_open = true,
+        },
+        {
+            text_func = function()
+                if self.updater:isPendingRestart() then
+                    return _("Update Pending Restart")
+                end
+
+                if self.updater:isUpdateAvailable() then
+                    local latest_version = self.updater:getLatestReleaseVersion()
+                    return T(_("Update to %1"), latest_version)
+                end
+
+                return _("Check for Updates")
+            end,
+            callback = function()
+                if self.updater:isPendingRestart() then
+                    UIManager:askForRestart(_("Grimmory plugin update will apply on next Restart."))
+                else
+                    self.dialog_manager:showPluginUpdateCheck()
+                end
+            end,
+        },
+    }
 end
 
 function GrimmoryMenu:getSyncOptionsMenu()
@@ -177,7 +231,12 @@ function GrimmoryMenu:getTopMenu()
             text = _("Reading Session Thresholds"),
             callback = function()
                 self.dialog_manager:showSessionThresholdSettings()
-            end
+            end,
+            separator = true,
+        },
+        {
+            text = _("About Grimmory Sync"),
+            sub_item_table = self:getAboutMenu(),
         },
     }
 end

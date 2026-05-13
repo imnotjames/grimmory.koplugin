@@ -252,4 +252,16 @@ function GrimmorySettings:setSynchronizedUntil(synchronizedUntil)
     self:update({ synchronizedUntil = synchronizedUntil })
 end
 
+function GrimmorySettings:toggleAutomaticCheckUpdates()
+    self:update({ automatic_check_updates = not self:getAutomaticCheckUpdates() })
+end
+
+function GrimmorySettings:getAutomaticCheckUpdates()
+    if self.data.automatic_check_updates == nil then
+        return DEFAULTS.automatic_check_updates
+    end
+
+    return self.data.automatic_check_updates
+end
+
 return GrimmorySettings

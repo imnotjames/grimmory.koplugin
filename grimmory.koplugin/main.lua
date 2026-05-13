@@ -13,6 +13,8 @@ local GrimmoryAPI = require("grimmory/grimmory_api")
 local GrimmorySynchronize = require("grimmory/synchronize")
 local GrimmoryScheduler = require("grimmory/scheduler")
 local GrimmoryReadingSessions = require("grimmory/reading_sessions")
+local GrimmorySelfUpdater = require("grimmory/ota/self_updater")
+local GithubAPI = require("grimmory/ota/github_api")
 
 local logger = require("grimmory/logger").new("Grimmory")
 
@@ -51,6 +53,12 @@ function Grimmory:init()
 
     self.reading_sessions = GrimmoryReadingSessions:new()
 
+    self.updater = GrimmorySelfUpdater:new({
+        github_api = GithubAPI:new(),
+        settings = self.settings,
+        scheduler = self.scheduler,
+    })
+
     self.api = GrimmoryAPI:new({
         settings = self.settings
     })
@@ -58,6 +66,7 @@ function Grimmory:init()
     self.dialog_manager = GrimmoryDialogManager:new({
         settings = self.settings,
         api = self.api,
+        updater = self.updater,
     })
 
     self.wifi_manager = GrimmoryWifiManager:new({
@@ -67,6 +76,7 @@ function Grimmory:init()
     self.menu = GrimmoryMenu:new({
         settings = self.settings,
         dialog_manager = self.dialog_manager,
+        updater = self.updater,
     })
 
     self.synchronizer = GrimmorySynchronize:new({
