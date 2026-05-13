@@ -130,12 +130,17 @@ function GrimmorySynchronize:getBookId(book_path, book_md5)
 
     logger:dbg("ID Cache miss", book_md5, book_path)
 
+    local book_id = DocMetadata:getGrimmoryId(book_path) or -1
+
+    if book_id < 0 then
+        self.md5_to_book_id_cache:insert(book_md5:lower(), book_id)
+        return book_id
+    end
+
     local isbn = DocMetadata:getISBN(book_path)
     local asin = DocMetadata:getASIN(book_path)
     local title = DocMetadata:getTitle(book_path)
     local author = DocMetadata:getAuthor(book_path)
-
-    local book_id = -1
 
     -- Instead of this, we should use a Grimmory search functionality.
     -- This works well enough for today, though.
@@ -523,6 +528,7 @@ function GrimmorySynchronize:synchronizeBooks(callback)
             -- After we're done, if the book exists we should attach it
             -- to associated shelves.
             self:associateWithShelves(download_path, book.shelves)
+            DocMetadata:setGrimmoryId(download_path, book.id)
         end
     end
 end

@@ -11,19 +11,12 @@ end
 
 function DocMetadata:getDocSettings(path)
     local settings = DocSettings:open(path)
-    if not settings then
-        return nil
-    end
 
     return settings
 end
 
 function DocMetadata:getDocProps(path)
     local settings = self:getDocSettings(path)
-
-    if settings == nil then
-        return {}
-    end
 
     local props = settings:readSetting("doc_props")
 
@@ -61,6 +54,52 @@ function DocMetadata:getIdentifier(path, typeOrTypes)
     end
 
     return nil
+end
+
+function DocMetadata:setIdentifier(path, type, identifier)
+    local identifiers = self:getIdentifiers(path)
+
+    if tostring(identifiers[type]) == tostring(identifier) then
+        -- Do nothing, no change needed
+        return
+    end
+
+    identifiers[type] = identifier
+
+    local serialized = ""
+    for key, value in pairs(identifiers) do
+        if #serialized > 0 then
+            serialized = serialized .. "\n"
+        end
+
+        serialized = serialized .. key .. ":" .. value
+    end
+
+    local settings = self:getDocSettings(path)
+
+    local props = settings:readSetting("doc_props") or {}
+
+    props.identifiers = serialized
+
+    settings:saveSetting("doc_props", props)
+    settings:flush()
+end
+
+function DocMetadata:getGrimmoryId(path)
+    local value = self:getIdentifier(
+        path,
+        { "grimmory" }
+    )
+
+    if value == nil then
+        return nil
+    end
+
+    return tonumber(value)
+end
+
+function DocMetadata:setGrimmoryId(path, grimmory_id)
+    self:setIdentifier(path, "grimmory", grimmory_id)
 end
 
 function DocMetadata:getISBN(path)
