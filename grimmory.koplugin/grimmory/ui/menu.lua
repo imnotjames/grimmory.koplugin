@@ -45,6 +45,7 @@ function GrimmoryMenu:getAboutMenu()
             end,
             callback = function()
                 self.settings:toggleAutomaticCheckUpdates()
+                UIManager:broadcastEvent(Event:new("GrimmorySettingsChanged"))
             end,
             keep_menu_open = true,
         },
