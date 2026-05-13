@@ -9,7 +9,9 @@ local UIManager = require("ui/uimanager")
 local PathChooser = require("ui/widget/pathchooser")
 local ProgressbarDialog = require("ui/widget/progressbardialog")
 
-local logger = require("grimmory/logger").new("GrimmorySettings")
+local GrimmoryLogger = require("grimmory/logger")
+
+local logger = GrimmoryLogger:new()
 
 ---@class DialogManager
 ---@field settings GrimmorySettings

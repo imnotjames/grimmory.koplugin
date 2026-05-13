@@ -1,14 +1,22 @@
 local logger = require("logger")
+local util = require("util")
 
-local NamespacedLogger = {
-    name = "Grimmory",
-}
-NamespacedLogger.__index = NamespacedLogger
+local function getPluginPath()
+    local source = debug.getinfo(3, "S").source
+    local path, _ = util.splitFileNameSuffix(source)
+    local plugin_path = path:sub(path:find(".koplugin/") + 10)
+    return "grimmory.koplugin/" .. plugin_path
+end
 
-function NamespacedLogger.new(name)
-    local self = setmetatable({}, NamespacedLogger)
-    self.name = name
-    return self
+local NamespacedLogger = {}
+
+function NamespacedLogger:new()
+    local obj = {
+        name = getPluginPath()
+    }
+    setmetatable(obj, self)
+    self.__index = self
+    return obj
 end
 
 function NamespacedLogger:dbg(...)

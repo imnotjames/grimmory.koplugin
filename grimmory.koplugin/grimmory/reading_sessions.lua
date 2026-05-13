@@ -4,7 +4,9 @@ local DataStorage = require("datastorage")
 local ReadHistory = require("readhistory")
 local util = require("util")
 
-local logger = require("grimmory/logger").new("reading_sessions")
+local GrimmoryLogger = require("grimmory/logger")
+
+local logger = GrimmoryLogger:new()
 
 local SESSION_COLLAPSE_THRESHOLD = 60.0
 

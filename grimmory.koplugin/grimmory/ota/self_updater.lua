@@ -7,8 +7,9 @@ local NetworkManager = require("ui/network/manager")
 local util = require("util")
 
 local PluginMetadata = require("_meta")
+local GrimmoryLogger = require("grimmory/logger")
 
-local logger = require("grimmory/logger").new("GrimmorySelfUpdater")
+local logger = GrimmoryLogger:new()
 
 
 local AUTOMATIC_UPDATE_SECONDS = 7200

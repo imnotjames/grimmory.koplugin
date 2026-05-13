@@ -5,8 +5,9 @@ local Event = require("ui/event")
 local UIManager = require("ui/uimanager")
 
 local PluginMetadata = require("_meta")
+local GrimmoryLogger = require("grimmory/logger")
 
-local logger = require("grimmory/logger").new("GrimmoryMenu")
+local logger = GrimmoryLogger:new()
 
 ---@class GrimmoryMenu
 ---@field settings GrimmorySettings

@@ -3,7 +3,9 @@ local _ = require("gettext")
 local DataStorage = require("datastorage")
 local LuaSettings = require("luasettings")
 
-local logger = require("grimmory/logger").new("GrimmorySettings")
+local GrimmoryLogger = require("grimmory/logger")
+
+local logger = GrimmoryLogger:new()
 
 -- Contains all of the stored settings and settings UI
 -- elements to control Grimmory connections & sync.

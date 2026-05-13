@@ -1,7 +1,9 @@
 local UIManager = require("ui/uimanager")
 local Random = require("random")
 
-local logger = require("grimmory/logger").new("GrimmoryScheduler")
+local GrimmoryLogger = require("grimmory/logger")
+
+local logger = GrimmoryLogger:new()
 
 ---@class GrimmoryScheduler
 local GrimmoryScheduler = {

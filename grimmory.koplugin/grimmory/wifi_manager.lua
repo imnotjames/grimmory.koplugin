@@ -1,7 +1,8 @@
 local Device = require("device")
 local NetworkManager = require("ui/network/manager")
+local GrimmoryLogger = require("grimmory/logger")
 
-local logger = require("grimmory/logger").new("WifiManager")
+local logger = GrimmoryLogger:new()
 
 local WifiManager = {}
 

@@ -4,8 +4,9 @@ local json = require("json")
 local ltn12 = require("ltn12")
 
 local PluginMetadata = require("_meta")
+local GrimmoryLogger = require("grimmory/logger")
 
-local logger = require("grimmory/logger").new("GrimmoryAPI")
+local logger = GrimmoryLogger:new()
 
 
 ---@param timestamp number

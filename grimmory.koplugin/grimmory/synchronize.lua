@@ -3,8 +3,9 @@ local ReadCollection = require("readcollection")
 local util = require("util")
 
 local DocMetadata = require("grimmory/doc_metadata")
+local GrimmoryLogger = require("grimmory/logger")
 
-local logger = require("grimmory/logger").new("GrimmorySynchronize")
+local logger = GrimmoryLogger:new()
 
 ---@class GrimmorySynchronize
 ---@field reading_sessions ReadingSessions

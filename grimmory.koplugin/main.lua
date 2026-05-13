@@ -15,8 +15,9 @@ local GrimmoryScheduler = require("grimmory/scheduler")
 local GrimmoryReadingSessions = require("grimmory/reading_sessions")
 local GrimmorySelfUpdater = require("grimmory/ota/self_updater")
 local GithubAPI = require("grimmory/ota/github_api")
+local GrimmoryLogger = require("grimmory/logger")
 
-local logger = require("grimmory/logger").new("Grimmory")
+local logger = GrimmoryLogger:new()
 
 local Grimmory = WidgetContainer:extend{
     name = "grimmory",
