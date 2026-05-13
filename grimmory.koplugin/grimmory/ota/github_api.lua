@@ -169,16 +169,19 @@ function GithubAPI:getReleaseAsset(repository, version, name_filter)
     return false, nil
 end
 
+---@return boolean ok success
+---@return string filename the filename on success or a message on failure
+---@return table asset the asset definition
 function GithubAPI:downloadReleaseArchive(repository, version, name_filter, download_path, progress_callback)
     local release_ok, asset = self:getReleaseAsset(repository, version, name_filter)
 
     if not release_ok then
-        return false, assert
+        return false, tostring(asset), {}
     end
 
     local download_file, file_error = io.open(download_path, "wb")
     if not download_file then
-        return false, file_error or "Unknown error opening file"
+        return false, file_error or "Unknown error opening file", asset
     end
 
     local bytes_total = asset.size
@@ -209,10 +212,10 @@ function GithubAPI:downloadReleaseArchive(repository, version, name_filter, down
             message = "HTTP Error: " .. tostring(code)
         end
 
-        return false, message
+        return false, message, asset
     end
 
-    return true, download_path
+    return true, download_path, asset
 end
 
 return GithubAPI

@@ -1,10 +1,11 @@
-local _ = require("gettext")
+local g = require("gettext")
 local T = require("ffi/util").template
 
 local Archiver = require("ffi/archiver")
 local DataStorage = require("datastorage")
 local NetworkManager = require("ui/network/manager")
 local util = require("util")
+local sha2 = require("ffi/sha2")
 
 local PluginMetadata = require("_meta")
 local GrimmoryLogger = require("grimmory/logger")
@@ -13,6 +14,36 @@ local logger = GrimmoryLogger:new()
 
 
 local AUTOMATIC_UPDATE_SECONDS = 7200
+
+local function verifyDigest(path, digest)
+    local digest_type, expected_digest_hex = digest:match("(%w+):(%x+)")
+
+    if digest_type ~= "sha256" then
+        logger:err("Unknown digest type", digest_type)
+        return false
+    end
+
+    -- The only way I know to do this is in-memory.
+    -- Given the plugin is small this should be safe?
+    local file = io.open(path, "rb")
+    if not file then
+        return false
+    end
+    local content = file:read("*a")
+    file:close()
+    if not content then
+        return false
+    end
+
+    local actual_digest_hex = sha2.sha256(content)
+
+    if expected_digest_hex ~= actual_digest_hex then
+        logger:err("Digest mismatch:", expected_digest_hex, "!=", actual_digest_hex)
+        return false
+    end
+
+    return true
+end
 
 local function getPluginPath()
     local source = debug.getinfo(1, "S").source
@@ -137,7 +168,7 @@ end
 function GrimmorySelfUpdater:downloadLatestRelease(progress_callback)
     if not self.latest_known_version then
         logger:err("Latest release is not defined")
-        return false, _("No latest release")
+        return false, g("No latest release")
     end
 
     local download_path = self.release_cache_path .. "/plugin-" .. self.latest_known_version .. "-" .. os.time() .. ".zip"
@@ -149,7 +180,7 @@ function GrimmorySelfUpdater:downloadLatestRelease(progress_callback)
         return false, directory_error_message
     end
 
-    local ok, result = self.github_api:downloadReleaseArchive(
+    local ok, result, asset = self.github_api:downloadReleaseArchive(
         PluginMetadata.repository,
         self.latest_known_version,
         self.release_asset_name,
@@ -169,13 +200,18 @@ function GrimmorySelfUpdater:downloadLatestRelease(progress_callback)
         return false, result
     end
 
+    if not verifyDigest(download_path, asset.digest) then
+        util.removeFile(download_path)
+        return false, g("Failed digest verification")
+    end
+
     return true, download_path
 end
 
 function GrimmorySelfUpdater:extractPlugin(source_path, target_path)
     local reader = Archiver.Reader:new()
     if not reader:open(source_path) then
-        return false, _("Failed to open downloaded archive.")
+        return false, g("Failed to open downloaded archive.")
     end
 
     local directory_exists, directory_error_message = util.makePath(self.plugin_path)
@@ -201,7 +237,7 @@ function GrimmorySelfUpdater:extractPlugin(source_path, target_path)
             local ok = reader:extractToPath(entry.path, extract_path)
 
             if not ok then
-                return false, _(T("Failed to extract file: %1", entry.path))
+                return false, T(g("Failed to extract file: %1"), entry.path)
             end
 
         end
