@@ -132,7 +132,7 @@ function GrimmorySynchronize:getBookId(book_path, book_md5)
 
     local book_id = DocMetadata:getGrimmoryId(book_path) or -1
 
-    if book_id < 0 then
+    if book_id >= 0 then
         self.md5_to_book_id_cache:insert(book_md5:lower(), book_id)
         return book_id
     end
