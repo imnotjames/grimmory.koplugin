@@ -122,6 +122,12 @@ function Grimmory:onSuspend()
     end
 end
 
+function Grimmory:onResume()
+    logger:dbg("Device is suspending")
+
+    self.reading_recorder:onSessionStart()
+end
+
 function Grimmory:onPowerOff()
     logger:dbg("Device is powering off")
 
