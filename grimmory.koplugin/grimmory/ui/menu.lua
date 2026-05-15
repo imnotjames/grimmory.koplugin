@@ -237,6 +237,16 @@ function GrimmoryMenu:getTopMenu()
             separator = true,
         },
         {
+            text = _("Sync Reading Progress"),
+            checked_func = function()
+                return self.settings:getSyncReadingProgress()
+            end,
+            callback = function()
+                self.settings:toggleSyncReadingProgress()
+            end,
+            separator = true,
+        },
+        {
             text = _("About Grimmory Sync"),
             sub_item_table = self:getAboutMenu(),
         },
