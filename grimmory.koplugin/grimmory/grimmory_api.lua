@@ -326,7 +326,7 @@ function GrimmoryAPI:getShelves()
     return ok, body
 end
 
-function GrimmoryAPI:recordSession(book_id, start_time, end_time, start_progress, end_progress)
+function GrimmoryAPI:recordSession(book_id, start_time, end_time, start_progress, end_progress, start_location, end_location)
     local duration_seconds = end_time - start_time
     local progress_delta = math.max(0, end_progress - start_progress)
 
@@ -342,8 +342,8 @@ function GrimmoryAPI:recordSession(book_id, start_time, end_time, start_progress
         startProgress = start_progress,
         endProgress = end_progress,
         progressDelta = progress_delta,
-        startLocation = nil,
-        endLocation = nil,
+        startLocation = start_location,
+        endLocation = end_location,
     }
 
     local ok, _, body = self:request(

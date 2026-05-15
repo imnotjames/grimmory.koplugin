@@ -201,7 +201,9 @@ function GrimmorySynchronize:synchronizeSessions(callback)
                 session.start_time,
                 session.end_time,
                 session.start_progress,
-                session.end_progress
+                session.end_progress,
+                session.start_location,
+                session.end_location
             )
 
             local book_id = self:getBookId(session.book_path, session.book_md5)
@@ -216,7 +218,9 @@ function GrimmorySynchronize:synchronizeSessions(callback)
                     session.start_time,
                     session.end_time,
                     session.start_progress,
-                    session.end_progress
+                    session.end_progress,
+                    session.start_location,
+                    session.end_location
                 )
             end
 
