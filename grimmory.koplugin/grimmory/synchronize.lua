@@ -8,7 +8,7 @@ local GrimmoryLogger = require("grimmory/logger")
 local logger = GrimmoryLogger:new()
 
 ---@class GrimmorySynchronize
----@field reading_sessions ReadingSessions
+---@field reading_sessions ReadingSessionRepository
 ---@field settings GrimmorySettings
 ---@field api GrimmoryAPI
 ---@field identifiers_to_book_id table<string, number>
@@ -202,8 +202,8 @@ function GrimmorySynchronize:synchronizeSessions(callback)
                 session.end_time,
                 session.start_progress,
                 session.end_progress,
-                session.start_location,
-                session.end_location
+                session.start_xpointer,
+                session.end_xpointer
             )
 
             local book_id = self:getBookId(session.book_path, session.book_md5)
@@ -219,8 +219,8 @@ function GrimmorySynchronize:synchronizeSessions(callback)
                     session.end_time,
                     session.start_progress,
                     session.end_progress,
-                    session.start_location,
-                    session.end_location
+                    session.start_xpointer,
+                    session.end_xpointer
                 )
             end
 
