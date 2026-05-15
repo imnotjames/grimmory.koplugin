@@ -217,9 +217,9 @@ end
 ---@param session_id number
 ---@param event_type ReadingSessionEventType
 ---@param current_page number
----@param total_pages number
+---@param page_count number
 ---@param xpointer string | nil
-function ReadingSessionRepository:insertBookEvent(session_id, event_type, current_page, total_pages, xpointer)
+function ReadingSessionRepository:insertBookEvent(session_id, event_type, current_page, page_count, xpointer)
     local ok, result = self:withSessionDatabase(
         function(conn)
             local stmt = conn:prepare([[
@@ -229,7 +229,7 @@ function ReadingSessionRepository:insertBookEvent(session_id, event_type, curren
                         created_at,
                         event_type,
                         current_page,
-                        total_pages,
+                        page_count,
                         xpointer
                     )
                 VALUES (?, ?, ?, ?, ?, ?)
@@ -240,7 +240,7 @@ function ReadingSessionRepository:insertBookEvent(session_id, event_type, curren
                 os.time(),
                 event_type,
                 current_page,
-                total_pages,
+                page_count,
                 xpointer
             )
 
@@ -271,7 +271,7 @@ function ReadingSessionRepository:getEvents(since)
                     e.event_type,
                     e.created_at,
                     e.current_page,
-                    e.total_pages,
+                    e.page_count,
                     e.xpointer
                 FROM book AS b
                 JOIN book_session AS s ON s.book_id = b.id

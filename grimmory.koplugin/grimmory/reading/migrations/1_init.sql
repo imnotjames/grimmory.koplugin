@@ -22,7 +22,7 @@ CREATE TABLE IF NOT EXISTS book_event
     event_type   text NOT NULL,
     created_at   integer NOT NULL DEFAULT 0,
     current_page integer NOT NULL DEFAULT 0,
-    total_pages  integer NOT NULL DEFAULT 0,
+    page_count   integer NOT NULL DEFAULT 0,
     xpointer     text,
     FOREIGN KEY(session_id) REFERENCES book_session(id)
 );
