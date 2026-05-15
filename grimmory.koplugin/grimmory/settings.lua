@@ -165,6 +165,18 @@ function GrimmorySettings:getSyncShelves()
     return self.data.syncShelves
 end
 
+function GrimmorySettings:toggleSyncReadingProgress()
+    self:update({ syncReadingProgress = not self:getSyncReadingProgress() })
+end
+
+function GrimmorySettings:getSyncReadingProgress()
+    if self.data.syncReadingProgress == nil then
+        return DEFAULTS.syncReadingProgress
+    end
+
+    return self.data.syncReadingProgress
+end
+
 function GrimmorySettings:toggleSyncReadingSessions()
     self:update({ syncReadingSessions = not self:getSyncReadingSessions() })
 end
