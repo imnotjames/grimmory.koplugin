@@ -12,10 +12,12 @@ local GrimmorySettings = require("grimmory/settings")
 local GrimmoryAPI = require("grimmory/grimmory_api")
 local GrimmorySynchronize = require("grimmory/synchronize")
 local GrimmoryScheduler = require("grimmory/scheduler")
-local GrimmoryReadingSessions = require("grimmory/reading_sessions")
 local GrimmorySelfUpdater = require("grimmory/ota/self_updater")
 local GithubAPI = require("grimmory/ota/github_api")
 local GrimmoryLogger = require("grimmory/logger")
+local GrimmoryReadingRecorder = require("grimmory/reading/recorder")
+local GrimmoryReadingSessions = require("grimmory/reading/repository")
+
 
 local logger = GrimmoryLogger:new()
 
@@ -53,7 +55,15 @@ function Grimmory:init()
     self.scheduler = GrimmoryScheduler:new()
     self.settings = GrimmorySettings:new()
 
-    self.reading_sessions = GrimmoryReadingSessions:new()
+    self.reading_sessions = GrimmoryReadingSessions:new({
+        settings = self.settings,
+    })
+
+    self.reading_recorder = GrimmoryReadingRecorder:new({
+        repository = self.reading_sessions,
+        settings = self.settings,
+        ui = self.ui,
+    })
 
     self.updater = GrimmorySelfUpdater:new({
         github_api = GithubAPI:new(),
@@ -105,6 +115,8 @@ end
 function Grimmory:onSuspend()
     logger:dbg("Device is suspending")
 
+    self.reading_recorder:onSessionEnd()
+
     if self.settings:getSyncOnSuspend() then
        self:onGrimmorySync()
     end
@@ -113,6 +125,8 @@ end
 function Grimmory:onPowerOff()
     logger:dbg("Device is powering off")
 
+    self.reading_recorder:onSessionEnd()
+
     if self.settings:getSyncOnPowerOff() then
        self:onGrimmorySync()
     end
@@ -120,10 +134,21 @@ end
 
 function Grimmory:onReaderReady()
     logger:dbg("Document open and ready")
+
+    self.reading_recorder:onSessionStart()
 end
+
+function Grimmory:onPageUpdate()
+    logger:dbg("Page Update")
+
+    self.reading_recorder:onPageUpdate()
+end
+
 
 function Grimmory:onCloseDocument()
     logger:dbg("Document closing")
+
+    self.reading_recorder:onSessionEnd()
 
     if self.settings:getSyncOnCloseDocument() then
         -- Do not block the UI thread
