@@ -17,6 +17,7 @@ CREATE TABLE IF NOT EXISTS book_session
 
 CREATE TABLE IF NOT EXISTS book_event
 (
+    id           integer PRIMARY KEY autoincrement,
     session_id   integer NOT NULL,
     event_type   text NOT NULL,
     created_at   integer NOT NULL DEFAULT 0,
