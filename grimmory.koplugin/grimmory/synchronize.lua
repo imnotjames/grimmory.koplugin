@@ -244,7 +244,7 @@ function GrimmorySynchronize:synchronizeSessions(callback)
 end
 
 function GrimmorySynchronize:isTargetShelf(shelf_id)
-    local target_shelves = self.settings:getTargetShelves() or {}
+    local target_shelves = self.settings:getSyncTargetShelves() or {}
 
     if #target_shelves == 0 then
         return true
@@ -397,7 +397,7 @@ function GrimmorySynchronize:downloadBook(book_id, download_path)
 end
 
 function GrimmorySynchronize:getBookDownloadPath(book)
-    local download_directory = self.settings:getDownloadDirectory()
+    local download_directory = self.settings:getSyncDownloadDirectory()
 
     if not download_directory or download_directory == "" then
         return nil
@@ -468,7 +468,7 @@ function GrimmorySynchronize:synchronizeBooks(callback)
         return
     end
 
-    local download_directory = self.settings:getDownloadDirectory()
+    local download_directory = self.settings:getSyncDownloadDirectory()
     if not download_directory or download_directory == "" then
         logger:err("Book download skipped because download directory is not set")
         return

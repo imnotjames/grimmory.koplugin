@@ -192,7 +192,7 @@ function GrimmoryMenu:getTopMenu()
             text_func = function()
                 local targetDescription = "All"
 
-                local targetShelves = self.settings:getTargetShelves()
+                local targetShelves = self.settings:getSyncTargetShelves()
 
                 local count = 0
                 for _, shelf in ipairs(targetShelves) do

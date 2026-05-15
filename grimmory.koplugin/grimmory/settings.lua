@@ -10,28 +10,55 @@ local logger = GrimmoryLogger:new()
 -- Contains all of the stored settings and settings UI
 -- elements to control Grimmory connections & sync.
 
+---@class GrimmoryTargetShelf
+---@field id number
+---@field name string
+
+---@class GrimmorySettingsData
+---@field automatic_check_updates boolean
+---@field base_uri string
+---@field username string
+---@field password string
+---@field session_threshold_seconds number
+---@field session_threshold_pages number
+---@field sync_on_close_document boolean
+---@field sync_on_suspend boolean
+---@field sync_on_power_off boolean
+---@field sync_enable_wifi boolean
+---@field sync_periodically boolean
+---@field sync_frequency number
+---@field sync_shelves boolean
+---@field sync_target_shelves GrimmoryTargetShelf[]
+---@field sync_download_directory string
+---@field sync_reading_sessions boolean
+---@field sync_reading_progress boolean
+---@field synchronized_until number
+
+---@type GrimmorySettingsData
 local DEFAULTS = {
-    synchronizedUntil = os.time(), -- plugin init time
-    baseUri = "",
+    automatic_check_updates = false,
+    synchronized_until = os.time(), -- plugin init time
+    base_uri = "",
     username = "",
     password = "",
-    sessionThresholdSeconds = 60,
-    sessionThresholdPages = 0,
-    syncOnCloseDocument = true,
-    syncOnSuspend = true,
-    syncOnPowerOff = true,
-    syncEnableWifi = false,
-    syncPeriodically = false,
-    syncFrequency = 120,
-    syncShelves = true,
-    syncReadingSessions = true,
-    targetShelves = {},
-    downloadDirectory = "grimmory/"
+    session_threshold_seconds = 60,
+    session_threshold_pages = 0,
+    sync_on_close_document = true,
+    sync_on_suspend = true,
+    sync_on_power_off = true,
+    sync_enable_wifi = false,
+    sync_periodically = false,
+    sync_frequency = 120,
+    sync_shelves = true,
+    sync_target_shelves = {},
+    sync_download_directory = "grimmory/",
+    sync_reading_sessions = true,
+    sync_reading_progress = true,
 }
 
 ---@class GrimmorySettings
 ---@field settings any Underlying lua settings interactions
----@field data any In-memory setting values
+---@field data GrimmorySettingsData In-memory setting values
 local GrimmorySettings = {
     data = DEFAULTS,
 }
@@ -43,8 +70,8 @@ local function openSettingsHandle()
   return LuaSettings:open(path)
 end
 
-function GrimmorySettings:new(o)
-    o = o or {}
+function GrimmorySettings:new()
+    local o = {}
     setmetatable(o, self)
     self.__index = self
     o:init()
@@ -61,7 +88,7 @@ function GrimmorySettings:init()
         self.data = result
     else
         logger:err("Error reading settings, using defaults", result)
-        self.data = {}
+        self.data = DEFAULTS
     end
 end
 
@@ -87,30 +114,14 @@ function GrimmorySettings:write()
     return true
 end
 
-function GrimmorySettings:update(patch)
-    for k, v in pairs(patch or {}) do
-        logger:dbg("Updating setting:", k, "=", v)
-        self.data[k] = v
-    end
-
-    return self:write()
-end
-
-function GrimmorySettings:getDownloadDirectory()
-    return self.data.downloadDirectory or DEFAULTS.downloadDirectory
-end
-
-function GrimmorySettings:setDownloadDirectory(downloadDirectory)
-    self:update({ downloadDirectory = downloadDirectory })
-end
-
 function GrimmorySettings:getBaseUri()
-    return self.data.baseUri or DEFAULTS.baseUri
+    return self.data.base_uri or DEFAULTS.base_uri
 end
 
 function GrimmorySettings:setBaseUri(uri)
     uri = tostring(uri or ""):gsub("/*$", "")
-    self:update({ baseUri = uri })
+    self.data.base_uri = uri
+    self:write()
 end
 
 function GrimmorySettings:getUsername()
@@ -118,7 +129,8 @@ function GrimmorySettings:getUsername()
 end
 
 function GrimmorySettings:setUsername(username)
-    self:update({ username = username })
+    self.data.username = username
+    self:write()
 end
 
 function GrimmorySettings:getPassword()
@@ -126,148 +138,170 @@ function GrimmorySettings:getPassword()
 end
 
 function GrimmorySettings:setPassword(password)
-    self:update({ password = password })
-end
-
-function GrimmorySettings:getTargetShelves()
-    return self.data.targetShelves or DEFAULTS.targetShelves
-end
-
-function GrimmorySettings:setTargetShelves(targetShelves)
-    self:update({ targetShelves = targetShelves })
+    self.data.password = password
+    self:write()
 end
 
 function GrimmorySettings:getSessionThresholdSeconds()
-    return self.data.sessionThresholdSeconds or DEFAULTS.sessionThresholdSeconds
+    return self.data.session_threshold_seconds or DEFAULTS.session_threshold_seconds
 end
 
-function GrimmorySettings:setSessionThresholdSeconds(sessionThresholdSeconds)
-    self:update({ sessionThresholdSeconds = sessionThresholdSeconds })
+---@param seconds integer
+function GrimmorySettings:setSessionThresholdSeconds(seconds)
+    self.data.session_threshold_seconds = seconds
+    self:write()
 end
 
 function GrimmorySettings:getSessionThresholdPages()
-    return self.data.sessionThresholdPages or DEFAULTS.sessionThresholdPages
+    return self.data.session_threshold_pages or DEFAULTS.session_threshold_pages
 end
 
-function GrimmorySettings:setSessionThresholdPages(sessionThresholdPages)
-    self:update({ sessionThresholdPages = sessionThresholdPages })
-end
-
-function GrimmorySettings:toggleSyncShelves()
-    self:update({ syncShelves = not self:getSyncShelves() })
+---@param pages integer
+function GrimmorySettings:setSessionThresholdPages(pages)
+    self.data.session_threshold_pages = pages
+    self:write()
 end
 
 function GrimmorySettings:getSyncShelves()
-    if self.data.syncShelves == nil then
-        return DEFAULTS.syncShelves
+    if self.data.sync_shelves == nil then
+        return DEFAULTS.sync_shelves
     end
 
-    return self.data.syncShelves
+    return self.data.sync_shelves
 end
 
-function GrimmorySettings:toggleSyncReadingProgress()
-    self:update({ syncReadingProgress = not self:getSyncReadingProgress() })
+function GrimmorySettings:toggleSyncShelves()
+    self.data.sync_shelves = not self.data.sync_shelves
+    self:write()
+end
+
+function GrimmorySettings:getSyncDownloadDirectory()
+    return self.data.sync_download_directory or DEFAULTS.sync_download_directory
+end
+
+---@param directory string
+function GrimmorySettings:setSyncDownloadDirectory(directory)
+    self.data.sync_download_directory = directory
+    self:write()
+end
+
+function GrimmorySettings:getSyncTargetShelves()
+    return self.data.sync_target_shelves or DEFAULTS.sync_target_shelves
+end
+
+---@param target_shelves GrimmoryTargetShelf
+function GrimmorySettings:setSyncTargetShelves(target_shelves)
+    self.data.sync_target_shelves = target_shelves
+    self:write()
 end
 
 function GrimmorySettings:getSyncReadingProgress()
-    if self.data.syncReadingProgress == nil then
-        return DEFAULTS.syncReadingProgress
+    if self.data.sync_reading_progress == nil then
+        return DEFAULTS.sync_reading_progress
     end
 
-    return self.data.syncReadingProgress
+    return self.data.sync_reading_progress
 end
 
-function GrimmorySettings:toggleSyncReadingSessions()
-    self:update({ syncReadingSessions = not self:getSyncReadingSessions() })
+function GrimmorySettings:toggleSyncReadingProgress()
+    self.data.sync_reading_progress = not self.data.sync_reading_progress
+    self:write()
 end
 
 function GrimmorySettings:getSyncReadingSessions()
-    if self.data.syncReadingSessions == nil then
-        return DEFAULTS.syncReadingSessions
+    if self.data.sync_reading_sessions == nil then
+        return DEFAULTS.sync_reading_sessions
     end
 
-    return self.data.syncReadingSessions
+    return self.data.sync_reading_sessions
 end
 
-function GrimmorySettings:toggleSyncPeriodically()
-    self:update({ syncPeriodically = not self:getSyncPeriodically()})
+function GrimmorySettings:toggleSyncReadingSessions()
+    self.data.sync_reading_sessions = not self.data.sync_reading_sessions
+    self:write()
 end
 
 function GrimmorySettings:getSyncPeriodically()
-    if self.data.syncPeriodically == nil then
-        return DEFAULTS.syncPeriodically
+    if self.data.sync_periodically == nil then
+        return DEFAULTS.sync_periodically
     end
 
-    return self.data.syncPeriodically
+    return self.data.sync_periodically
 end
 
-
-function GrimmorySettings:setSyncFrequency(syncFrequency)
-    self:update({ syncFrequency = syncFrequency })
+function GrimmorySettings:toggleSyncPeriodically()
+    self.data.sync_periodically = not self.data.sync_periodically
+    self:write()
 end
 
 function GrimmorySettings:getSyncFrequency()
-    return self.data.syncFrequency or DEFAULTS.syncFrequency
+    return self.data.sync_frequency or DEFAULTS.sync_frequency
 end
 
-function GrimmorySettings:toggleSyncOnCloseDocument()
-    self:update({ syncOnCloseDocument = not self:getSyncOnCloseDocument() })
+function GrimmorySettings:setSyncFrequency(seconds)
+    self.data.sync_frequency = seconds
+    self:write()
 end
 
 function GrimmorySettings:getSyncOnCloseDocument()
-    if self.data.syncOnCloseDocument == nil then
-        return DEFAULTS.syncOnCloseDocument
+    if self.data.sync_on_close_document == nil then
+        return DEFAULTS.sync_on_close_document
     end
 
-    return self.data.syncOnCloseDocument
+    return self.data.sync_on_close_document
 end
 
-function GrimmorySettings:toggleSyncOnSuspend()
-    self:update({ syncOnSuspend = not self:getSyncOnSuspend() })
+function GrimmorySettings:toggleSyncOnCloseDocument()
+    self.data.sync_on_close_document = not self.data.sync_on_close_document
 end
 
 function GrimmorySettings:getSyncOnSuspend()
-    if self.data.syncOnSuspend == nil then
-        return DEFAULTS.syncOnSuspend
+    if self.data.sync_on_suspend == nil then
+        return DEFAULTS.sync_on_suspend
     end
 
-    return self.data.syncOnSuspend
+    return self.data.sync_on_suspend
 end
 
-function GrimmorySettings:toggleSyncOnPowerOff()
-    self:update({ syncOnPowerOff = not self:getSyncOnPowerOff() })
+function GrimmorySettings:toggleSyncOnSuspend()
+    self.data.sync_on_suspend = not self.data.sync_on_suspend
+    self:write()
 end
 
 function GrimmorySettings:getSyncOnPowerOff()
-    if self.data.syncOnPowerOff == nil then
-        return DEFAULTS.syncOnPowerOff
+    if self.data.sync_on_power_off == nil then
+        return DEFAULTS.sync_on_power_off
     end
 
-    return self.data.syncOnPowerOff
+    return self.data.sync_on_power_off
 end
 
-function GrimmorySettings:toggleSyncEnableWifi()
-    self:update({ syncEnableWifi = not self:getSyncEnableWifi() })
+function GrimmorySettings:toggleSyncOnPowerOff()
+    self.data.sync_on_power_off = not self.data.sync_on_power_off
+    self:write()
 end
 
 function GrimmorySettings:getSyncEnableWifi()
-    if self.data.syncEnableWifi == nil then
-        return DEFAULTS.syncEnableWifi
+    if self.data.sync_enable_wifi == nil then
+        return DEFAULTS.sync_enable_wifi
     end
 
-    return self.data.syncEnableWifi
+    return self.data.sync_enable_wifi
+end
+
+function GrimmorySettings:toggleSyncEnableWifi()
+    self.data.sync_enable_wifi = not self.data.sync_enable_wifi
+    self:write()
 end
 
 function GrimmorySettings:getSynchronizedUntil()
-    return self.data.synchronizedUntil or DEFAULTS.synchronizedUntil
+    return self.data.synchronized_until or DEFAULTS.synchronized_until
 end
 
-function GrimmorySettings:setSynchronizedUntil(synchronizedUntil)
-    self:update({ synchronizedUntil = synchronizedUntil })
-end
-
-function GrimmorySettings:toggleAutomaticCheckUpdates()
-    self:update({ automatic_check_updates = not self:getAutomaticCheckUpdates() })
+---@param timestamp number
+function GrimmorySettings:setSynchronizedUntil(timestamp)
+    self.data.synchronized_until = timestamp
+    self:write()
 end
 
 function GrimmorySettings:getAutomaticCheckUpdates()
@@ -276,6 +310,11 @@ function GrimmorySettings:getAutomaticCheckUpdates()
     end
 
     return self.data.automatic_check_updates
+end
+
+function GrimmorySettings:toggleAutomaticCheckUpdates()
+    self.data.automatic_check_updates = not self.data.automatic_check_updates
+    self:write()
 end
 
 return GrimmorySettings
