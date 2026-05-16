@@ -214,7 +214,7 @@ function GrimmorySettings:getSyncTargetShelves()
     return self.data.sync_target_shelves or DEFAULTS.sync_target_shelves
 end
 
----@param target_shelves GrimmoryTargetShelf
+---@param target_shelves GrimmoryTargetShelf[]
 function GrimmorySettings:setSyncTargetShelves(target_shelves)
     self.data.sync_target_shelves = target_shelves
     self:write()

@@ -4,6 +4,7 @@ local T = require("ffi/util").template
 local ButtonDialog = require("ui/widget/buttondialog")
 local Event = require("ui/event")
 local InfoMessage = require("ui/widget/infomessage")
+local ConfirmDialog = require("ui/widget/confirmdialog")
 local MultiInputDialog = require("ui/widget/multiinputdialog")
 local UIManager = require("ui/uimanager")
 local PathChooser = require("ui/widget/pathchooser")
@@ -136,7 +137,7 @@ function DialogManager:showTargetShelvesSettings()
                 text = _("All Shelves"),
                 callback = function()
                     logger:info("Set target shelves to All Shelves")
-                    self.settings:setTargetShelves({})
+                    self.settings:setSyncTargetShelves({})
 
                     UIManager:broadcastEvent(Event:new("GrimmorySettingsChanged"))
 
@@ -166,7 +167,7 @@ function DialogManager:showTargetShelvesSettings()
                     text = uniqueShelfName,
                     callback = function()
                         logger:info("Set target shelves to shelf ID", shelfId)
-                        self.settings:setTargetShelves({ { id = shelfId, name = uniqueShelfName } })
+                        self.settings:setSyncTargetShelves({ { id = shelfId, name = uniqueShelfName } })
 
                         UIManager:broadcastEvent(Event:new("GrimmorySettingsChanged"))
 
@@ -273,9 +274,9 @@ function DialogManager:showDownloadDirectorySettings()
         title = "Download Directory",
         select_file = false,
         show_files = false,
-        path = self.settings:getDownloadDirectory(),
+        path = self.settings:getSyncDownloadDirectory(),
         onConfirm = function(newPath)
-            self.settings:setDownloadDirectory(newPath)
+            self.settings:setSyncDownloadDirectory(newPath)
         end,
     })
 
