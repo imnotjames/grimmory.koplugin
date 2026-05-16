@@ -89,6 +89,7 @@ function GrimmorySettings:init()
     else
         logger:err("Error reading settings, using defaults", result)
         self.data = DEFAULTS
+        self:write()
     end
 end
 
