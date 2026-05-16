@@ -13,12 +13,10 @@ local logger = GrimmoryLogger:new()
 ---@field reading_sessions ReadingSessionRepository
 ---@field settings GrimmorySettings
 ---@field api GrimmoryAPI
----@field identifiers_to_book_id table<string, number>
+---@field book_resolver GrimmoryBookResolver
 ---@field cached_books Book[]
 local GrimmorySynchronize = {
     synchronize_sessions_since = 0,
-    md5_to_book_id_cache = Cache:new({ slots = 4096 }),
-    identifiers_to_book_id = {},
     cached_books = {},
 }
 
@@ -51,9 +49,6 @@ function GrimmorySynchronize:refreshBooksFromAPI()
     ---@type table<string, number>
     self.identifiers_to_book_id = {}
 
-    ---@type Book[]
-    self.cached_books = {}
-
     local ok, books = self.api:getBooks()
 
     if not ok or type(books) == "string" then
@@ -61,114 +56,15 @@ function GrimmorySynchronize:refreshBooksFromAPI()
         return {}
     end
 
+    self.book_resolver:refreshBooks(books)
+
+    ---@type Book[]
+    self.cached_books = {}
+
     for _, book in ipairs(books) do
-        local metadata = book.metadata
-
-        if metadata then
-            if metadata.asin then
-                self.identifiers_to_book_id["asin:" .. metadata.asin:lower()] = book.id
-            end
-
-            if metadata.isbn13 then
-                self.identifiers_to_book_id["isbn:" .. metadata.isbn13] = book.id
-            elseif metadata.isbn10 then
-                self.identifiers_to_book_id["isbn:" .. metadata.isbn10] = book.id
-            end
-
-            if metadata.title and metadata.authors then
-                local author = metadata.authors[0] or metadata.authors[1]
-                local titleIdentifier = self:getTitleIdentifier(metadata.title, author)
-
-                if titleIdentifier then
-                    self.identifiers_to_book_id["title-id:" .. titleIdentifier] = book.id
-                end
-            end
+        if self:isTargetBook(book) then
+            table.insert(self.cached_books, book)
         end
-
-        local filename = nil
-        if book.primary_file and book.primary_file.filename then
-            filename = book.primary_file.filename
-            self.identifiers_to_book_id["filename:" .. filename] = book.id
-        end
-
-        if filename then
-            local shelves = {}
-
-            if book.shelves then
-                for _, shelf_id in ipairs(book.shelves) do
-                    table.insert(shelves, shelf_id)
-                end
-            end
-
-            local is_matching_shelf = false
-            for _, shelf_id in ipairs(shelves) do
-                if self:isTargetShelf(shelf_id) then
-                    is_matching_shelf = true
-                    break
-                end
-            end
-
-            if is_matching_shelf then
-                table.insert(self.cached_books, book)
-            end
-        end
-    end
-end
-
-function GrimmorySynchronize:getBookId(book_path, book_md5)
-    if book_md5 == nil then
-        book_md5 = util.partialMD5(book_path)
-    end
-
-    local cache_value = self.md5_to_book_id_cache:get(book_md5:lower())
-    if cache_value ~= nil then
-        logger:dbg("ID Cache hit", book_md5, book_path)
-        if cache_value < 0 then
-            return nil
-        end
-
-        return cache_value
-    end
-
-    logger:dbg("ID Cache miss", book_md5, book_path)
-
-    local book_id = DocMetadata:getGrimmoryId(book_path) or -1
-
-    if book_id >= 0 then
-        self.md5_to_book_id_cache:insert(book_md5:lower(), book_id)
-        return book_id
-    end
-
-    local isbn = DocMetadata:getISBN(book_path)
-    local asin = DocMetadata:getASIN(book_path)
-    local title = DocMetadata:getTitle(book_path)
-    local author = DocMetadata:getAuthor(book_path)
-
-    -- Instead of this, we should use a Grimmory search functionality.
-    -- This works well enough for today, though.
-    local identifiers = self.identifiers_to_book_id
-
-    local title_id = self:getTitleIdentifier(title, author)
-    local _, filename = util.splitFilePathName(book_path)
-
-    if identifiers ~= nil then
-        if isbn and identifiers["isbn:" .. isbn] then
-            book_id = identifiers["isbn:" .. isbn]
-        elseif asin and identifiers["asin:" .. asin:lower()] then
-            book_id = identifiers["asin:" .. asin:lower()]
-        elseif title_id and identifiers["title-id:" .. title_id] then
-            book_id = identifiers["title-id:" .. title_id]
-        elseif filename and identifiers["filename:" .. filename] then
-            book_id = identifiers["filename:" .. filename]
-        end
-    end
-
-    self.md5_to_book_id_cache:insert(book_md5:lower(), book_id)
-
-    if book_id < 0 then
-        return nil
-    else
-        return book_id
     end
 end
 
@@ -208,7 +104,7 @@ function GrimmorySynchronize:synchronizeSessions(callback)
                 session.end_xpointer
             )
 
-            local book_id = self:getBookId(session.book_path, session.book_md5)
+            local book_id = self.book_resolver:getBookId(session.book_path, session.book_md5)
 
             local ok = false
             local body = nil
@@ -243,6 +139,32 @@ function GrimmorySynchronize:synchronizeSessions(callback)
             end
         end
     end
+end
+
+---@param book Book
+---@return boolean
+function GrimmorySynchronize:isTargetBook(book)
+    if not book.primary_file or not book.primary_file.filename then
+        return false
+    end
+
+    local target_shelves = self.settings:getSyncTargetShelves() or {}
+
+    if #target_shelves == 0 then
+        return true
+    end
+
+    if not book.shelves then
+        return false
+    end
+
+    for _, shelf_id in ipairs(book.shelves) do
+        if self:isTargetShelf(shelf_id) then
+            return true
+        end
+    end
+
+    return false
 end
 
 function GrimmorySynchronize:isTargetShelf(shelf_id)
@@ -413,7 +335,7 @@ function GrimmorySynchronize:getBookDownloadPath(book)
     end
 
     -- If the path exists we have to check to make sure that it is actually the book we care about
-    if self:getBookId(download_path) == book.id then
+    if self.book_resolver:getBookId(download_path) == book.id then
         -- We have a match, this path is safe.
         return download_path
     end
@@ -435,7 +357,7 @@ function GrimmorySynchronize:getBookDownloadPath(book)
     end
 
     -- Okay, this file exists.  It's GOT to be our file, though, right?
-    if self:getBookId(download_path) == book.id then
+    if self.book_resolver:getBookId(download_path) == book.id then
         -- We have a match, this path is safe.
         return download_path
     end
