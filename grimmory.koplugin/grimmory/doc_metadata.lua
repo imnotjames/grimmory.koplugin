@@ -124,4 +124,51 @@ function DocMetadata:getAuthor(path)
     return self:getDocProps(path).authors
 end
 
+---@param path string
+function DocMetadata:clearProgress(path)
+    self:setProgress(path, nil, nil, nil)
+end
+
+---@param path string
+---@param percent number | nil
+---@param xpointer string | nil
+---@param page number | nil
+function DocMetadata:setProgress(path, percent, xpointer, page)
+    local settings = self:getDocSettings(path)
+
+    if percent ~= nil then
+        settings:saveSetting("percent_finished", percent)
+    else
+        settings:delSetting("percent_finished")
+    end
+
+    if xpointer ~= nil then
+        settings:saveSetting("last_xpointer", xpointer)
+    else
+        settings:delSetting("last_xpointer")
+    end
+
+    if page ~= nil then
+        settings:saveSetting("last_page", page)
+    else
+        settings:delSetting("last_page")
+    end
+
+    settings:flush()
+end
+
+---@param path string
+---@return number | nil percent
+---@return string | nil xpointer
+---@return number | nil page
+function DocMetadata:getProgress(path)
+    local settings = self:getDocSettings(path)
+
+    local percent = settings:readSetting("percent_finished")
+    local xpointer = settings:readSetting("last_xpointer")
+    local page = settings:readSetting("last_page")
+
+    return percent, xpointer, page
+end
+
 return DocMetadata
