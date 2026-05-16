@@ -1,5 +1,7 @@
 local Cache = require("cache")
 local ReadCollection = require("readcollection")
+local random = require("random")
+local md5 = require("ffi/sha2").md5
 local util = require("util")
 
 local DocMetadata = require("grimmory/doc_metadata")
@@ -539,9 +541,73 @@ function GrimmorySynchronize:synchronizeBooks(callback)
     end
 end
 
+function GrimmorySynchronize:synchronizeProgress(callback)
+    local device_name = self.settings:getDeviceName()
+    local device_id = self.settings:getDeviceId()
+
+    local sync_ok, sync_enabled = self.api:getKoreaderSync()
+
+    if not sync_ok then
+        logger:err("Could not read sync status")
+        return
+    end
+
+    if not sync_enabled then
+        -- If sync isn't enabled, let's try to enable it.
+        local ok = self.api:setKoreaderSync(true)
+
+        if not ok then
+            logger:err("Failed to set koreader sync status")
+            return
+        end
+    end
+
+    -- Get recent progress records
+    local credentials_ok, koreader_auth_id, koreader_auth_secret = self.api:getKoreaderCredentials()
+
+    if not credentials_ok then
+        logger:err("Failed to get koreader sync credentials")
+        return
+    end
+
+    if not koreader_auth_id or not koreader_auth_secret then
+        logger:err("Koreader username or auth key are not set")
+
+        koreader_auth_id = koreader_auth_id or random.uuid()
+        koreader_auth_secret = koreader_auth_secret or random.uuid()
+
+        local set_credentials_ok = self.api:setKoreaderCredentials(koreader_auth_id, koreader_auth_secret)
+
+        if not set_credentials_ok then
+            logger:err("Failed to set koreader credentials")
+            return
+        end
+    end
+
+    local koreader_auth_md5 = md5(koreader_auth_secret)
+
+    local reading_progress_records = self.reading_sessions:getReadingProgress()
+
+    -- From Koreader to grimmory
+    for _, progress in ipairs(reading_progress_records) do
+        self.api:pushReadingProgress(
+            koreader_auth_id,
+            koreader_auth_md5,
+            device_name,
+            device_id,
+            progress.book_md5,
+            progress.end_time,
+            progress.end_progress,
+            progress.end_xpointer
+        )
+    end
+end
+
 function GrimmorySynchronize:synchronizeAll(callback)
     -- Refresh so we pull fresh books
     self:refreshBooksFromAPI()
+
+    self:synchronizeProgress(callback)
 
     self:synchronizeShelves(callback)
 
@@ -550,8 +616,6 @@ function GrimmorySynchronize:synchronizeAll(callback)
     self:synchronizeBooks(callback)
 
     logger:info("Highlights not implemented yet")
-
-    logger:info("Progress not implemented yet")
 
     logger:info("Personal ratings not implemented yet")
 

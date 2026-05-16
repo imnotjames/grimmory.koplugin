@@ -2,6 +2,8 @@ local _ = require("gettext")
 
 local DataStorage = require("datastorage")
 local LuaSettings = require("luasettings")
+local random = require("random")
+local Device = require("device")
 
 local GrimmoryLogger = require("grimmory/logger")
 
@@ -33,6 +35,8 @@ local logger = GrimmoryLogger:new()
 ---@field sync_reading_sessions boolean
 ---@field sync_reading_progress boolean
 ---@field synchronized_until number
+---@field device_id string
+---@field device_name string
 
 ---@type GrimmorySettingsData
 local DEFAULTS = {
@@ -54,6 +58,8 @@ local DEFAULTS = {
     sync_download_directory = "grimmory/",
     sync_reading_sessions = true,
     sync_reading_progress = true,
+    device_id = random.uuid(),
+    device_name = Device.model,
 }
 
 ---@class GrimmorySettings
@@ -113,6 +119,24 @@ function GrimmorySettings:write()
     end
 
     return true
+end
+
+function GrimmorySettings:getDeviceId()
+    return self.data.device_id or DEFAULTS.device_id
+end
+
+function GrimmorySettings:setDeviceId(device_id)
+    self.data.device_id = device_id
+    self:write()
+end
+
+function GrimmorySettings:getDeviceName()
+    return self.data.device_name or DEFAULTS.device_name
+end
+
+function GrimmorySettings:setDeviceName(device_name)
+    self.data.device_name = device_name
+    self:write()
 end
 
 function GrimmorySettings:getBaseUri()

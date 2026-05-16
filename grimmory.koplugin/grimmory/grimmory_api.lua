@@ -362,4 +362,118 @@ function GrimmoryAPI:recordSession(book_id, start_time, end_time, start_progress
     return ok, body
 end
 
+function GrimmoryAPI:getKoreaderSync()
+    local ok, _, body = self:request(
+        "GET",
+        "/api/v1/koreader-users/me"
+    )
+
+    if not ok or not body then
+        return false, nil
+    end
+
+    return true, body["syncEnabled"]
+end
+
+---@param enabled boolean
+function GrimmoryAPI:setKoreaderSync(enabled)
+    local ok, _, body = self:request(
+        "PATCH",
+        "/api/v1/koreader-users/me/sync?enabled=" .. tostring(enabled)
+    )
+
+    if not ok then
+        return false, body
+    end
+
+    return true, nil
+end
+
+---@return boolean ok
+---@return string | nil auth_id
+---@return string | nil auth_secret
+function GrimmoryAPI:getKoreaderCredentials()
+    local ok, _, body = self:request(
+        "GET",
+        "/api/v1/koreader-users/me"
+    )
+
+    if not ok or not body then
+        return false, nil, nil
+    end
+
+    return true, body["username"], body["password"]
+end
+
+function GrimmoryAPI:setKoreaderCredentials(auth_key, auth_secret)
+    local request = {
+        username = auth_key,
+        password = auth_secret,
+    }
+
+    local ok, _, body = self:request(
+        "PUT",
+        "/api/v1/koreader-users/me",
+        request
+    )
+
+    if not ok or not body then
+        return false
+    end
+
+    return true
+end
+
+function GrimmoryAPI:pushReadingProgress(username, auth_key, device, device_id, book_md5, timestamp, percentage, location)
+    local request = {
+        document = book_md5,
+        timestamp = timestamp,
+        percentage = percentage,
+        progress = location,
+        device = device,
+        device_id = device_id,
+    }
+
+    local headers = {
+        ["x-auth-user"] = username,
+        ["x-auth-key"] = auth_key,
+    }
+
+    local ok, _, body = self:request(
+        "PUT",
+        "/api/koreader/syncs/progress",
+        request,
+        headers
+    )
+
+    if not ok then
+        logger:err("Unable to push progress for book:", book_md5, "-", body)
+        return false, nil
+    end
+
+    return ok
+end
+
+function GrimmoryAPI:getReadingProgress(username, auth_key, book_md5)
+    local headers = {
+        ["x-auth-user"] = username,
+        ["x-auth-key"] = auth_key,
+    }
+
+    local ok, _, body = self:request(
+        "PUT",
+        "/api/koreader/syncs/progress/" .. book_md5,
+        nil,
+        headers
+    )
+
+    if not ok then
+        logger:err("Unable to read progress for book:", book_md5, "-", body)
+        return false, nil
+    end
+
+    return ok, body
+
+end
+
 return GrimmoryAPI
