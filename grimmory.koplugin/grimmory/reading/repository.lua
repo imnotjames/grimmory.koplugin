@@ -49,6 +49,16 @@ end
 ---@field page_count number
 ---@field xpointer string | nil
 
+---@class ReadingSessionProgress
+---@field book_partial_md5 string
+---@field book_md5 string
+---@field book_path string
+---@field end_time number
+---@field end_page number
+---@field page_count number
+---@field end_progress number
+---@field end_xpointer string | nil
+
 ---@class ReadingSessionRepository
 ---@field migrations_path string
 ---@field sessions_database_path string
@@ -254,6 +264,70 @@ function ReadingSessionRepository:insertBookEvent(session_id, event_type, curren
     if not ok then
         logger:err("Failed to create session event:", result)
     end
+end
+
+---@return ReadingSessionProgress[] progress
+function ReadingSessionRepository:getReadingProgress()
+    local ok, results = ReadingSessionRepository:withSessionDatabase(
+        function(conn)
+            local stmt = conn:prepare([[
+                SELECT
+                    book.book_path,
+                    book.partial_md5,
+                    book.full_md5,
+
+                    book_session.created_at,
+                    book_session.current_page,
+                    book_session.page_count,
+                    book_session.xpointer
+                FROM (
+                    SELECT
+                        s.book_id,
+                        MAX(e.id) AS event_id
+                    FROM book_event e
+                    JOIN book_session s ON s.id = e.session_id
+                    GROUP BY s.book_id
+                ) AS last_event
+                JOIN book_event ON last_event.event_id = book_event.id
+                JOIN book_session ON book_event.session_id = book_session.id
+                JOIN book ON book_session.book_id = book.id;
+            ]])
+
+            ---@type ReadingSessionProgress[]
+            local results = {}
+
+            for row in stmt:rows() do
+                local end_page = row[5]
+                local page_count = row[6]
+
+                local end_progress = end_page / page_count
+
+                ---@type ReadingSessionProgress
+                local progress = {
+                    book_path = row[1],
+                    book_md5 = row[2],
+                    book_partial_md5 = row[3],
+                    end_time = row[4],
+                    end_page = end_page,
+                    page_count = page_count,
+                    end_progress = end_progress,
+                    end_location = row[7],
+                }
+                table.insert(results, progress)
+            end
+
+            stmt:close()
+
+            return results
+        end
+    )
+
+    if not ok then
+        logger:err("Failed to get reading progress:", results)
+        return {}
+    end
+
+    return results
 end
 
 ---@param since integer
