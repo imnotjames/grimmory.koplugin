@@ -330,6 +330,72 @@ function ReadingSessionRepository:getReadingProgress()
     return results
 end
 
+---@param book_md5 string
+---@return ReadingSessionProgress | nil progress
+function ReadingSessionRepository:getReadingProgressForBook(book_md5)
+    local ok, result = ReadingSessionRepository:withSessionDatabase(
+        function(conn)
+            local stmt = conn:prepare([[
+                SELECT
+                    book.book_path,
+                    book.partial_md5,
+                    book.full_md5,
+
+                    book_session.created_at,
+                    book_session.current_page,
+                    book_session.page_count,
+                    book_session.xpointer
+                FROM (
+                    SELECT
+                        s.book_id,
+                        MAX(e.id) AS event_id
+                    FROM book_event e
+                    JOIN book_session s ON s.id = e.session_id
+                    GROUP BY s.book_id
+                ) AS last_event
+                JOIN book_event ON last_event.event_id = book_event.id
+                JOIN book_session ON book_event.session_id = book_session.id
+                JOIN book ON book_session.book_id = book.id
+                WHERE book_md5 = ? OR book_partial_md5 = ?
+                LIMIT 1
+            ]])
+
+            stmt:bind(book_md5, book_md5)
+
+            local row = stmt:rows()
+
+            stmt:close()
+
+            if row == nil then
+                return nil
+            end
+
+            local end_page = row[5]
+            local page_count = row[6]
+
+            local end_progress = end_page / page_count
+
+            return {
+                    book_path = row[1],
+                    book_md5 = row[2],
+                    book_partial_md5 = row[3],
+                    end_time = row[4],
+                    end_page = end_page,
+                    page_count = page_count,
+                    end_progress = end_progress,
+                    end_location = row[7],
+            }
+        end
+    )
+
+    if not ok then
+        logger:err("Failed to get reading progress:", result)
+        return nil
+    end
+
+    return result
+end
+
 ---@param since integer
 ---@return ReadingSessionEvent[]
 function ReadingSessionRepository:getEvents(since)
