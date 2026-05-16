@@ -326,6 +326,13 @@ function GrimmoryAPI:getShelves()
     return ok, body
 end
 
+---@param book_id number
+---@param start_time number
+---@param end_time number
+---@param start_progress number
+---@param end_progress number
+---@param start_location string
+---@param end_location string
 function GrimmoryAPI:recordSession(book_id, start_time, end_time, start_progress, end_progress, start_location, end_location)
     local duration_seconds = end_time - start_time
     local progress_delta = math.max(0, end_progress - start_progress)
