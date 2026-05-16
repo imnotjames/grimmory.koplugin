@@ -144,10 +144,15 @@ function Grimmory:onReaderReady()
     self.reading_recorder:onSessionStart()
 end
 
-function Grimmory:onPageUpdate()
-    logger:dbg("Page Update")
+function Grimmory:onPageUpdate(page)
+    logger:info("Page Update", page)
 
-    self.reading_recorder:onPageUpdate()
+    -- Run after everything else does for a page event.
+    -- This prevents issues like the previous page's xpointer being
+    -- returned for a given page.
+    UIManager:nextTick(function()
+        self.reading_recorder:onPageUpdate()
+    end)
 end
 
 
