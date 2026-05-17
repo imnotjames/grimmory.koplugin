@@ -5,6 +5,7 @@ local Dispatcher = require("dispatcher")
 local UIManager = require("ui/uimanager")
 local WidgetContainer = require("ui/widget/container/widgetcontainer")
 
+local GrimmoryBookResolver = require("grimmory/book_resolver")
 local GrimmoryDialogManager = require("grimmory/ui/dialog_manager")
 local GrimmoryMenu = require("grimmory/ui/menu")
 local GrimmoryWifiManager = require("grimmory/wifi_manager")
@@ -75,6 +76,8 @@ function Grimmory:init()
         settings = self.settings
     })
 
+    self.book_resolver = GrimmoryBookResolver:new()
+
     self.dialog_manager = GrimmoryDialogManager:new({
         settings = self.settings,
         api = self.api,
@@ -95,6 +98,7 @@ function Grimmory:init()
         settings = self.settings,
         reading_sessions = self.reading_sessions,
         api = self.api,
+        book_resolver = self.book_resolver,
     })
 
     self:onGrimmorySettingsChanged()

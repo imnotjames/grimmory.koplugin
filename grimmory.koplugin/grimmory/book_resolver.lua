@@ -25,15 +25,15 @@ local function getTitleIdentifier(title, author)
 end
 
 ---@class GrimmoryBookResolver
----@field md5_to_book_id_cache any
----@field identifiers_to_book_id table<string, number>
+---@field private md5_to_book_id_cache any
+---@field private identifiers_to_book_id table<string, number>
 local GrimmoryBookResolver = {
     md5_to_book_id_cache = Cache:new({ slots = 4096 }),
     identifiers_to_book_id = {},
 }
 
-function GrimmoryBookResolver:new(o)
-    o = o or {}
+function GrimmoryBookResolver:new()
+    local o = {}
     setmetatable(o, self)
     self.__index = self
     return o
