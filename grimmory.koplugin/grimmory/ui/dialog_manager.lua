@@ -2,6 +2,7 @@ local _ = require("gettext")
 local T = require("ffi/util").template
 
 local ButtonDialog = require("ui/widget/buttondialog")
+local ConfirmBox = require("ui/widget/confirmbox")
 local Event = require("ui/event")
 local InfoMessage = require("ui/widget/infomessage")
 local MultiInputDialog = require("ui/widget/multiinputdialog")
@@ -17,6 +18,7 @@ local logger = GrimmoryLogger:new()
 ---@field settings GrimmorySettings
 ---@field api GrimmoryAPI
 ---@field updater GrimmorySelfUpdater
+---@field reading_progress_manager ReadingProgressManager
 local DialogManager = {}
 
 function DialogManager:new(o)
@@ -358,6 +360,24 @@ function DialogManager:showPluginUpdater()
     end)
 end
 
+---@param progress ReadingSessionProgress
+function DialogManager:showApplyProgressConfirmation(progress)
+    -- TODO:
 
+    -- Reading Progress is Available from Grimmory
+    -- Go to page 25 from 25 minutes ago?
+
+    local dialog = ConfirmBox:new({
+        text = T(
+            _("Go to latest location %1% from Grimmory?"),
+            tostring(progress.end_progress * 100)
+        ),
+        ok_callback = function()
+            self.reading_progress_manager:applyProgress(progress)
+        end,
+    })
+
+    UIManager:show(dialog)
+end
 
 return DialogManager

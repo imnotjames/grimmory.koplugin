@@ -137,7 +137,11 @@ function Grimmory:onSuspend()
 end
 
 function Grimmory:onResume()
-    logger:dbg("Device is suspending")
+    logger:dbg("Device is resuming")
+
+    if self.settings:getSyncReadingProgress() then
+        self:syncProgressForOpenBook()
+    end
 
     self.reading_recorder:onSessionStart()
 end
@@ -253,6 +257,30 @@ function Grimmory:onScheduleAutomaticUpdates()
         end
 
         self.release_check_cancel = nil
+    end
+end
+
+function Grimmory:syncProgressForOpenBook()
+    if self.ui == nil or self.ui.document == nil or self.ui.document.file == nil then
+        return
+    end
+
+    local book_path = self.ui.document.file
+
+    local callback = function()
+        local _, _, latest_progress = self.reading_progress_manager:getNewerProgressForBook(book_path)
+
+        if not latest_progress then
+            return
+        end
+
+        self.dialog_manager:showApplyProgressConfirmation(latest_progress)
+    end
+
+    if self.settings:getSyncEnableWifi() then
+        self.wifi_manager:withWifi(callback)
+    else
+        UIManager:nextTick(callback)
     end
 end
 
