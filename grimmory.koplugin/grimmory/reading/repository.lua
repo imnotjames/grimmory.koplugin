@@ -51,9 +51,8 @@ end
 ---@field book_md5 string
 ---@field book_path string
 ---@field end_time number
----@field end_page number
----@field page_count number
 ---@field end_progress number
+---@field end_page number | nil
 ---@field end_xpointer string | nil
 
 ---@class ReadingSessionRepository
@@ -291,18 +290,23 @@ function ReadingSessionRepository:getReadingProgress()
             local results = {}
 
             for row in stmt:rows() do
-                local end_page = row[4]
-                local page_count = row[5]
+                local end_time = tonumber(row[3], 10) or 0
 
-                local end_progress = end_page / page_count
+                local end_page = tonumber(row[4]) or 0
+                local page_count = tonumber(row[5]) or 0
+
+                local end_progress = 0
+
+                if page_count > 0 then
+                    end_progress = end_page / page_count
+                end
 
                 ---@type ReadingSessionProgress
                 local progress = {
                     book_path = row[1],
                     book_md5 = row[2],
-                    end_time = row[3],
+                    end_time = end_time,
                     end_page = end_page,
-                    page_count = page_count,
                     end_progress = end_progress,
                     end_location = row[6],
                 }
@@ -362,17 +366,22 @@ function ReadingSessionRepository:getReadingProgressForBook(book_md5)
                 return nil
             end
 
-            local end_page = row[4]
-            local page_count = row[5]
+            local end_time = tonumber(row[3], 10) or 0
 
-            local end_progress = end_page / page_count
+            local end_page = tonumber(row[4]) or 0
+            local page_count = tonumber(row[5]) or 0
+
+            local end_progress = 0
+
+            if page_count > 0 then
+                end_progress = end_page / page_count
+            end
 
             return {
                     book_path = row[1],
                     book_md5 = row[2],
-                    end_time = row[3],
+                    end_time = end_time,
                     end_page = end_page,
-                    page_count = page_count,
                     end_progress = end_progress,
                     end_location = row[6],
             }
