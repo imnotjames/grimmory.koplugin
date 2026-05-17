@@ -454,6 +454,9 @@ function GrimmoryAPI:pushReadingProgress(username, auth_key, device, device_id, 
     return ok
 end
 
+---@param username string
+---@param auth_key string
+---@param book_md5 string
 function GrimmoryAPI:getReadingProgress(username, auth_key, book_md5)
     local headers = {
         ["x-auth-user"] = username,
@@ -461,13 +464,13 @@ function GrimmoryAPI:getReadingProgress(username, auth_key, book_md5)
     }
 
     local ok, _, body = self:request(
-        "PUT",
+        "GET",
         "/api/koreader/syncs/progress/" .. book_md5,
         nil,
         headers
     )
 
-    if not ok then
+    if not ok or not body or type(body) == "string" then
         logger:err("Unable to read progress for book:", book_md5, "-", body)
         return false, nil
     end
