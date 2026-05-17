@@ -308,7 +308,7 @@ function ReadingSessionRepository:getReadingProgress()
                     end_time = end_time,
                     end_page = end_page,
                     end_progress = end_progress,
-                    end_location = row[6],
+                    end_xpointer = row[6],
                 }
                 table.insert(results, progress)
             end
@@ -383,7 +383,7 @@ function ReadingSessionRepository:getReadingProgressForBook(book_md5)
                     end_time = end_time,
                     end_page = end_page,
                     end_progress = end_progress,
-                    end_location = row[6],
+                    end_xpointer = row[6],
             }
         end
     )
