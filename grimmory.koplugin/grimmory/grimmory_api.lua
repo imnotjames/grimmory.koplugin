@@ -39,27 +39,6 @@ local function fromISO8601(value)
     })
 end
 
----@param api GrimmoryAPI
----@param base_uri string
----@param username string
----@param password string
-local function getAccessToken(api, base_uri, username, password)
-    local uri = base_uri .. "/api/v1/auth/login"
-
-    local credentials = {
-        username = username,
-        password = password,
-    }
-
-    local ok, _, body = api:rawRequest("POST", uri, credentials)
-
-    if ok and body then
-        return body["accessToken"]
-    end
-
-    return nil
-end
-
 ---@class BookMetadata
 ---@field isbn13 string | nil
 ---@field isbn10 string | nil
@@ -112,12 +91,16 @@ local function parseBook(book)
     }
 end
 
+local function getUserAgent()
+    return "grimmory.koplugin/" .. PluginMetadata.version .. " (" .. PluginMetadata.repository .. ")"
+end
+
 ---@class GrimmoryAPI
-local GrimmoryAPI = {
-    ---@type GrimmorySettings
-    settings = nil,
-    cached_access_token = nil,
-}
+---@field settings GrimmorySettings
+---@field private cached_access_token string
+---@field private cached_refresh_token string
+---@field private cached_token_expiry number
+local GrimmoryAPI = {}
 
 function GrimmoryAPI:new(o)
     o = o or {}
@@ -138,14 +121,47 @@ function GrimmoryAPI:getUri(path)
     return base_uri .. path
 end
 
-function GrimmoryAPI:getUserAgent()
-    return "grimmory.koplugin/" .. PluginMetadata.version .. " (" .. PluginMetadata.repository .. ")"
+function GrimmoryAPI:refreshToken(refresh_token)
+    local uri = self:getUri("/api/v1/auth/refresh")
+
+    local credentials = {
+        refreshToken = refresh_token,
+    }
+
+    local ok, _, body = self:rawRequest("POST", uri, credentials)
+
+    if not ok or not body then
+        return false, nil, nil, 0
+    end
+
+    return ok, body["accessToken"], body["refreshToken"], tonumber(body["expires"])
 end
+
+---@param base_uri string
+---@param username string
+---@param password string
+function GrimmoryAPI:getToken(base_uri, username, password)
+    local uri = base_uri .. "/api/v1/auth/login"
+
+    local credentials = {
+        username = username,
+        password = password,
+    }
+
+    local ok, _, body = self:rawRequest("POST", uri, credentials)
+
+    if not ok or not body then
+        return false, nil, nil, 0
+    end
+
+    return ok, body["accessToken"], body["refreshToken"], tonumber(body["expires"])
+end
+
 
 function GrimmoryAPI:rawRequest(method, uri, data, headers, sink)
     headers = headers or {}
 
-    headers["User-Agent"] = self:getUserAgent()
+    headers["User-Agent"] = getUserAgent()
 
     local client
     if uri:match("^http:") then
@@ -218,30 +234,65 @@ function GrimmoryAPI:request(method, path, data, headers, sink)
 
     local uri = self:getUri(path)
 
-    local access_token = self.cached_access_token
+    if self.cached_refresh_token ~= nil and self.cached_token_expiry <= os.time() then
+        -- If token exists but is expired, try to refresh
 
-    if access_token == nil then
-        access_token = getAccessToken(
-            self,
+        local refresk_token_ok, access_token, refresh_token, expiration = self:refreshToken(
+            self.cached_refresh_token
+        )
+
+        if refresk_token_ok and access_token and refresh_token then
+            self.cached_token_expiry = os.time() + (expiration or 3600)
+            self.cached_refresh_token = refresh_token
+            self.cached_access_token = access_token
+        else
+            -- We're expired and can't refresh.  Toss out the cached
+            -- token data and let the block below do its deal.
+            self.cached_token_expiry = 0
+            self.cached_refresh_token = nil
+            self.cached_access_token = nil
+        end
+    end
+
+    if self.cached_access_token == nil then
+        local access_token_ok, access_token, refresh_token, expiration = self:getToken(
             self.settings:getBaseUri(),
             self.settings:getUsername(),
             self.settings:getPassword()
         )
+
+        if not access_token_ok or not access_token or not refresh_token then
+            return false, 0, "Could not get access token"
+        end
+
+        -- Default expiration to 2 minutes if it's not defined.
+        -- For Grimmory this is "safe" as we usually default to 7200
+        self.cached_token_expiry = os.time() + (expiration or 3600)
+        self.cached_refresh_token = refresh_token
         self.cached_access_token = access_token
     end
 
-    if access_token then
-        headers["Authorization"] = "Bearer " .. access_token
+    if self.cached_access_token then
+        headers["Authorization"] = "Bearer " .. self.cached_access_token
     end
 
-    return self:rawRequest(method, uri, data, headers, sink)
+    local ok, code, response = self:rawRequest(method, uri, data, headers, sink)
+
+    if code == 401 then
+        logger:warn("Token expired or was otherwise invalid")
+        self.cached_token_expiry = nil
+        self.cached_refresh_token = nil
+        self.cached_access_token = nil
+    end
+
+
+    return ok, code, response
 end
 
 function GrimmoryAPI:testConnection(base_uri, username, password)
     base_uri = base_uri:gsub("/+$", "") 
 
-    local access_token = getAccessToken(
-        self,
+    local access_token = self:getToken(
         base_uri,
         username,
         password
