@@ -7,6 +7,7 @@ local WidgetContainer = require("ui/widget/container/widgetcontainer")
 
 local GrimmoryBookResolver = require("grimmory/book_resolver")
 local GrimmoryDialogManager = require("grimmory/ui/dialog_manager")
+local GrimmoryExecutor = require("grimmory/executor")
 local GrimmoryMenu = require("grimmory/ui/menu")
 local GrimmoryWifiManager = require("grimmory/wifi_manager")
 local GrimmorySettings = require("grimmory/settings")
@@ -111,6 +112,8 @@ function Grimmory:init()
         reading_progress_manager = self.reading_progress_manager,
     })
 
+    self.executor = GrimmoryExecutor:new()
+
     self:onGrimmorySettingsChanged()
 
     self.ui.menu:registerToMainMenu(self.menu)
@@ -124,6 +127,7 @@ function Grimmory:onExit()
     logger:dbg("Exiting")
 
     self.scheduler:clear()
+    self.executor:clear()
 end
 
 function Grimmory:onSuspend()
@@ -320,26 +324,31 @@ function Grimmory:onGrimmorySync(verbose)
         -- In the future, we should limit what we sync
         -- to current or recent books.  For now, we sync everything.
 
-        local ok, result = pcall(function()
-            self.synchronizer:synchronizeAll(
-                function(progress)
-                    if progress.since then
-                        -- Update since
-                        self.settings:setSynchronizedUntil(progress.since)
-                    end
-
-                    if progress.state == "session-recorded" then
-                        sessionCount = sessionCount + 1
-                    elseif progress.state == "session-error" then
-                        sessionErrorCount = sessionErrorCount + 1
-                    elseif progress.state == "book-downloaded" then
-                        bookCount = bookCount + 1
-                    elseif progress.state == "book-error" then
-                        bookErrorCount = bookErrorCount + 1
-                    end
+        local ok, result = self.executor:run(
+            function(progress_callback)
+                self.synchronizer:synchronizeAll(progress_callback)
+            end,
+            function(progress)
+                if type("progress") ~= "table" then
+                    return
                 end
-            )
-        end)
+
+                if progress.since then
+                    -- Update since
+                    self.settings:setSynchronizedUntil(progress.since)
+                end
+
+                if progress.state == "session-recorded" then
+                    sessionCount = sessionCount + 1
+                elseif progress.state == "session-error" then
+                    sessionErrorCount = sessionErrorCount + 1
+                elseif progress.state == "book-downloaded" then
+                    bookCount = bookCount + 1
+                elseif progress.state == "book-error" then
+                    bookErrorCount = bookErrorCount + 1
+                end
+            end
+        )
 
         if not ok then
             logger:err("Failed sync", result)
@@ -375,11 +384,13 @@ function Grimmory:onGrimmorySync(verbose)
         end
     end
 
-    if self.settings:getSyncEnableWifi() then
-        self.wifi_manager:withWifi(sync_callback)
-    else
-        UIManager:nextTick(sync_callback)
-    end
+    self.executor:wrap(function()
+        if self.settings:getSyncEnableWifi() then
+            self.wifi_manager:withWifi(sync_callback)
+        else
+            sync_callback()
+        end
+    end)
 end
 
 return Grimmory
