@@ -279,7 +279,7 @@ function Grimmory:syncProgressForOpenBook()
 
     local callback = function()
         local ok, latest_progress = self.executor:run(
-            function(progress_callback)
+            function()
                 local _, _, latest_progress = self.reading_progress_manager:getNewerProgressForBook(book_path)
                 return latest_progress
             end
