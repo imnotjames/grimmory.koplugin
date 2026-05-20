@@ -278,20 +278,27 @@ function Grimmory:syncProgressForOpenBook()
     local book_path = self.ui.document.file
 
     local callback = function()
-        local _, _, latest_progress = self.reading_progress_manager:getNewerProgressForBook(book_path)
+        local ok, latest_progress = self.executor:run(
+            function(progress_callback)
+                local _, _, latest_progress = self.reading_progress_manager:getNewerProgressForBook(book_path)
+                return latest_progress
+            end
+        )
 
-        if not latest_progress then
+        if not ok or not latest_progress then
             return
         end
 
         self.dialog_manager:showApplyProgressConfirmation(latest_progress)
     end
 
-    if self.settings:getSyncEnableWifi() then
-        self.wifi_manager:withWifi(callback)
-    else
-        UIManager:nextTick(callback)
-    end
+    self.executor:wrap(function()
+        if self.settings:getSyncEnableWifi() then
+            self.wifi_manager:withWifi(callback)
+        else
+            callback()
+        end
+    end)
 end
 
 function Grimmory:isReadyToSync()
