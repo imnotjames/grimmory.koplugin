@@ -196,7 +196,7 @@ function GrimmorySettings:getSyncShelves()
 end
 
 function GrimmorySettings:toggleSyncShelves()
-    self.data.sync_shelves = not self.data.sync_shelves
+    self.data.sync_shelves = not self:getSyncShelves()
     self:write()
 end
 
@@ -229,7 +229,7 @@ function GrimmorySettings:getSyncReadingProgress()
 end
 
 function GrimmorySettings:toggleSyncReadingProgress()
-    self.data.sync_reading_progress = not self.data.sync_reading_progress
+    self.data.sync_reading_progress = not self:getSyncReadingProgress()
     self:write()
 end
 
@@ -255,7 +255,7 @@ function GrimmorySettings:getSyncPeriodically()
 end
 
 function GrimmorySettings:toggleSyncPeriodically()
-    self.data.sync_periodically = not self.data.sync_periodically
+    self.data.sync_periodically = not self:getSyncPeriodically()
     self:write()
 end
 
@@ -277,7 +277,7 @@ function GrimmorySettings:getSyncOnCloseDocument()
 end
 
 function GrimmorySettings:toggleSyncOnCloseDocument()
-    self.data.sync_on_close_document = not self.data.sync_on_close_document
+    self.data.sync_on_close_document = not self:getSyncOnCloseDocument()
 end
 
 function GrimmorySettings:getSyncOnSuspend()
@@ -289,7 +289,7 @@ function GrimmorySettings:getSyncOnSuspend()
 end
 
 function GrimmorySettings:toggleSyncOnSuspend()
-    self.data.sync_on_suspend = not self.data.sync_on_suspend
+    self.data.sync_on_suspend = not self:getSyncOnSuspend()
     self:write()
 end
 
@@ -302,7 +302,7 @@ function GrimmorySettings:getSyncOnPowerOff()
 end
 
 function GrimmorySettings:toggleSyncOnPowerOff()
-    self.data.sync_on_power_off = not self.data.sync_on_power_off
+    self.data.sync_on_power_off = not self:getSyncOnPowerOff()
     self:write()
 end
 
@@ -315,7 +315,7 @@ function GrimmorySettings:getSyncEnableWifi()
 end
 
 function GrimmorySettings:toggleSyncEnableWifi()
-    self.data.sync_enable_wifi = not self.data.sync_enable_wifi
+    self.data.sync_enable_wifi = not self:getSyncEnableWifi()
     self:write()
 end
 
@@ -338,7 +338,7 @@ function GrimmorySettings:getAutomaticCheckUpdates()
 end
 
 function GrimmorySettings:toggleAutomaticCheckUpdates()
-    self.data.automatic_check_updates = not self.data.automatic_check_updates
+    self.data.automatic_check_updates = not self:getAutomaticCheckUpdates()
     self:write()
 end
 
