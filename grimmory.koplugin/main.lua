@@ -329,10 +329,10 @@ function Grimmory:onGrimmorySync(verbose)
             )
         end
 
-        local sessionCount = 0
-        local sessionErrorCount = 0
-        local bookCount = 0
-        local bookErrorCount = 0
+        local session_count = 0
+        local session_error_count = 0
+        local book_count = 0
+        local book_error_count = 0
 
         -- In the future, we should limit what we sync
         -- to current or recent books.  For now, we sync everything.
@@ -352,13 +352,13 @@ function Grimmory:onGrimmorySync(verbose)
                 end
 
                 if progress.state == "session-recorded" then
-                    sessionCount = sessionCount + 1
+                    session_count = session_count + 1
                 elseif progress.state == "session-error" then
-                    sessionErrorCount = sessionErrorCount + 1
+                    session_error_count = session_error_count + 1
                 elseif progress.state == "book-downloaded" then
-                    bookCount = bookCount + 1
+                    book_count = book_count + 1
                 elseif progress.state == "book-error" then
-                    bookErrorCount = bookErrorCount + 1
+                    book_error_count = book_error_count + 1
                 end
             end
         )
@@ -377,7 +377,7 @@ function Grimmory:onGrimmorySync(verbose)
 
         if verbose then
             local message
-            if sessionErrorCount > 0 or bookErrorCount > 0 then
+            if session_error_count > 0 or book_error_count > 0 then
                 message = T(
                     _(
                         "Completed Grimmory sync\n" +
@@ -386,16 +386,16 @@ function Grimmory:onGrimmorySync(verbose)
                         "%3 book(s) downloaded\n" +
                         "%4 book(s) failed"
                     ),
-                    sessionCount,
-                    sessionErrorCount,
-                    bookCount,
-                    bookErrorCount
+                    session_count,
+                    session_error_count,
+                    book_count,
+                    book_error_count
                 )
             else
                 message = T(
                     _("Completed Grimmory sync\n%1 session(s) recorded\n%2 book(s) downloaded"),
-                    sessionCount,
-                    bookCount
+                    session_count,
+                    book_count
                 )
             end
 
