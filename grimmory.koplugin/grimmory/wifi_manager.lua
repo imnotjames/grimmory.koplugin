@@ -4,6 +4,7 @@ local GrimmoryLogger = require("grimmory/logger")
 
 local logger = GrimmoryLogger:new()
 
+---@class WifiManager
 local WifiManager = {}
 
 function WifiManager:new(o)

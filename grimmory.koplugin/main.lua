@@ -1,3 +1,8 @@
+--[[--
+Grimmory KOReader Plugin
+
+@module koplugin.Grimmory
+--]]--
 local _ = require("gettext")
 local T = require("ffi/util").template
 
@@ -24,18 +29,19 @@ local GrimmoryReadingProgressManager = require("grimmory/reading/progress_manage
 
 local logger = GrimmoryLogger:new()
 
+---@class Grimmory
+---@field wifi_manager WifiManager
+---@field dialog_manager DialogManager
+---@field scheduler GrimmoryScheduler
+---@field synchronizer GrimmorySynchronize
+---@field ui any This is a ReaderUI
 local Grimmory = WidgetContainer:extend{
     name = "grimmory",
     is_doc_only = false,
-    is_stub = false,
     periodic_sync_cancel = nil,
     periodic_sync_update = nil,
     release_check_cancel = nil,
-    wifi_manager = nil,
-    dialog_manager = nil,
-    scheduler = nil,
     menu = nil,
-    synchronizer = nil,
 }
 
 function Grimmory:onDispatcherRegisterActions()
