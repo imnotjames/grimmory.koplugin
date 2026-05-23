@@ -323,12 +323,19 @@ function Grimmory:onGrimmorySync(verbose)
 
         logger:info("Synchronizing to Grimmory")
 
+        local should_terminate = false
+
+        local update_callback, close_callback
         if verbose then
-            self.dialog_manager:toast(
-                _("Starting Grimmory sync...")
+            update_callback, close_callback = self.dialog_manager:showProgressDialog(
+                _("Synchronizing to Grimmory"),
+                function()
+                    should_terminate = true
+                end
             )
         end
 
+        local indeterminate_progress = 0
         local session_count = 0
         local session_error_count = 0
         local book_count = 0
@@ -341,10 +348,18 @@ function Grimmory:onGrimmorySync(verbose)
             function(progress_callback)
                 self.synchronizer:synchronizeAll(progress_callback)
             end,
-            function(progress)
+            function(progress, terminate)
+                if should_terminate then
+                    terminate()
+                end
+
                 if type(progress) ~= "table" then
                     return
                 end
+
+                indeterminate_progress = (indeterminate_progress + 1) % 20
+                update_callback(indeterminate_progress, 20)
+
 
                 if progress.since then
                     -- Update since
@@ -362,6 +377,10 @@ function Grimmory:onGrimmorySync(verbose)
                 end
             end
         )
+
+        if close_callback then
+            close_callback()
+        end
 
         if not ok then
             logger:err("Failed sync", result)

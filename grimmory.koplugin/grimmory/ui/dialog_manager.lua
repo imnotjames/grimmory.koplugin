@@ -360,6 +360,45 @@ function DialogManager:showPluginUpdater()
     end)
 end
 
+function DialogManager:showProgressDialog(title, dismiss_callback)
+    local dialog
+
+    if dismiss_callback ~= nil then
+        dismiss_callback = function()
+            local confirm_dialog = ConfirmBox:new({
+                text = _("Cancel Synchronization?"),
+                ok_callback = function()
+                    pcall(dismiss_callback)
+                    UIManager:close(dialog)
+                end,
+            })
+
+            UIManager:show(confirm_dialog)
+        end
+    end
+
+    dialog = ProgressbarDialog:new({
+        title = _(title),
+        progress_max = 100,
+        refresh_time_seconds = 3,
+        dismissable = dismiss_callback ~= nil,
+        dismiss_callback = dismiss_callback,
+    })
+
+    UIManager:show(dialog)
+
+    local function update_callback(progress, total_progress)
+        dialog.progress_max = total_progress
+        dialog:reportProgress(progress)
+    end
+
+    local function close_callback()
+        UIManager:close(dialog)
+    end
+
+    return update_callback, close_callback
+end
+
 ---@param progress ReadingSessionProgress
 function DialogManager:showApplyProgressConfirmation(progress)
     -- TODO:

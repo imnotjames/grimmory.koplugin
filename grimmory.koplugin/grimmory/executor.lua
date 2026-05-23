@@ -209,6 +209,8 @@ function GrimmoryExecutor:run(runnable, on_progress)
                 break
             end
 
+            pcall(on_progress, nil, terminate)
+
             local continue_func = function() coroutine.resume(running_coroutine) end
             UIManager:scheduleIn(0.1, continue_func)
 
