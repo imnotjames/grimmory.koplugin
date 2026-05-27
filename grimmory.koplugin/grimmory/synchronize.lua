@@ -322,6 +322,7 @@ function GrimmorySynchronize:downloadBook(book_id, download_path)
     return true, nil
 end
 
+---@param book Book
 function GrimmorySynchronize:getBookDownloadPath(book)
     local download_directory = self.settings:getSyncDownloadDirectory()
 
@@ -345,13 +346,13 @@ function GrimmorySynchronize:getBookDownloadPath(book)
     -- At this point we need a fallback name.  `download-${BOOK_ID}.${EXT}` is not
     -- great but I don't know a better safe way off hand.
 
-    local file_extension = util.getFileNameSuffix(book.filename)
+    local file_extension = util.getFileNameSuffix(book.primary_file.filename)
 
     if file_extension == "" or file_extension == nil then
         file_extension = "bin"
     end
 
-     download_path = download_directory .. "/downloaded-" .. tonumber(book.id) .. "." .. file_extension
+    download_path = download_directory .. "/downloaded-" .. tonumber(book.id) .. "." .. file_extension
 
     -- If this path doesn't exist yet, we're good?
     if not util.fileExists(download_path) then
