@@ -140,6 +140,10 @@ end
 ---@param base_uri string
 ---@param username string
 ---@param password string
+---@return boolean ok
+---@return string | nil access_token
+---@return string | nil refresh_token
+---@return number expiry
 function GrimmoryAPI:getToken(base_uri, username, password)
     local uri = base_uri .. "/api/v1/auth/login"
 
@@ -154,7 +158,8 @@ function GrimmoryAPI:getToken(base_uri, username, password)
         return false, nil, nil, 0
     end
 
-    return ok, body["accessToken"], body["refreshToken"], tonumber(body["expires"])
+    local expiry = tonumber(body["expires"]) or 0
+    return ok, body["accessToken"], body["refreshToken"], expiry
 end
 
 
@@ -291,11 +296,15 @@ end
 function GrimmoryAPI:testConnection(base_uri, username, password)
     base_uri = base_uri:gsub("/+$", "")
 
-    local access_token = self:getToken(
+    local access_token_ok, access_token = self:getToken(
         base_uri,
         username,
         password
     )
+
+    if not access_token_ok then
+        return false, access_token
+    end
 
     local headers = {}
 
