@@ -362,9 +362,17 @@ end
 
 function DialogManager:showProgressDialog(title, dismiss_callback)
     local dialog
+    local is_closing = false
 
     if dismiss_callback ~= nil then
         dismiss_callback = function()
+            if is_closing then
+                -- The dismiss callback is fired even when
+                -- an outside force is trying to close the
+                -- dialog.
+                return
+            end
+
             local confirm_dialog = ConfirmBox:new({
                 text = _("Cancel Synchronization?"),
                 ok_callback = function()
@@ -393,6 +401,7 @@ function DialogManager:showProgressDialog(title, dismiss_callback)
     end
 
     local function close_callback()
+        is_closing = true
         UIManager:close(dialog)
     end
 
