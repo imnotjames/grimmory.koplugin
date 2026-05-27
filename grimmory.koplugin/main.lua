@@ -384,12 +384,22 @@ function Grimmory:onGrimmorySync(verbose)
         end
 
         if not ok then
-            logger:err("Failed sync", result)
+            if should_terminate then
+                logger:info("Sync was interrupted by user")
 
-            if verbose then
-                self.dialog_manager:toast(
-                    T(_("Failed to Synchronize to Grimmory"))
-                )
+                if verbose then
+                    self.dialog_manager:toast(
+                        _("Grimmory synchronization has been interrupted")
+                    )
+                end
+            else
+                logger:err("Failed sync", result)
+
+                if verbose then
+                    self.dialog_manager:toast(
+                        _("Failed to Synchronize to Grimmory")
+                    )
+                end
             end
 
             return
