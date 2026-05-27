@@ -110,6 +110,8 @@ body:
     attributes:
       label: Log
       description: |
+        Logs may contain sensitive information that require redaction - such as usernames, device identifiers,
+        or other personally identifying information.
         Logs are written to `crash.log`. It can normally be found in the KOReader directory:
         * Cervantes: `/mnt/private/koreader`
         * Kindle: `koreader/`
