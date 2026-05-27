@@ -365,33 +365,31 @@ function DialogManager:showProgressDialog(title, dismiss_callback, dismiss_text)
     local confirm_dialog
     local is_closing = false
 
-    if dismiss_callback ~= nil then
-        if dismiss_text == nil then
-            dismiss_text = _("Terminate this task?")
+    if dismiss_text == nil then
+        dismiss_text = _("Terminate this task?")
+    end
+
+    local confirm_dismiss = function()
+        if is_closing then
+            -- The dismiss callback is fired even when
+            -- an outside force is trying to close the
+            -- dialog.
+            return
         end
 
-        dismiss_callback = function()
-            if is_closing then
-                -- The dismiss callback is fired even when
-                -- an outside force is trying to close the
-                -- dialog.
-                return
-            end
-
-            if confirm_dialog then
-                UIManager:close(confirm_dialog)
-            end
-
-            confirm_dialog = ConfirmBox:new({
-                text = dismiss_text,
-                ok_callback = function()
-                    pcall(dismiss_callback)
-                    UIManager:close(dialog)
-                end,
-            })
-
-            UIManager:show(confirm_dialog)
+        if confirm_dialog then
+            UIManager:close(confirm_dialog)
         end
+
+        confirm_dialog = ConfirmBox:new({
+            text = dismiss_text,
+            ok_callback = function()
+                pcall(dismiss_callback)
+                UIManager:close(dialog)
+            end,
+        })
+
+        UIManager:show(confirm_dialog)
     end
 
     dialog = ProgressbarDialog:new({
@@ -399,7 +397,7 @@ function DialogManager:showProgressDialog(title, dismiss_callback, dismiss_text)
         progress_max = 100,
         refresh_time_seconds = 3,
         dismissable = dismiss_callback ~= nil,
-        dismiss_callback = dismiss_callback,
+        dismiss_callback = confirm_dismiss,
     })
 
     UIManager:show(dialog)
