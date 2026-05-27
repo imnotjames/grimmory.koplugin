@@ -1,3 +1,4 @@
+local _ = require("gettext")
 local http = require("socket.http")
 local https = require("ssl.https")
 local json = require("json")
@@ -303,7 +304,7 @@ function GrimmoryAPI:testConnection(base_uri, username, password)
     )
 
     if not access_token_ok then
-        return false, access_token
+        return false, _("Failed to retrieve access token")
     end
 
     local headers = {}
