@@ -35,7 +35,7 @@ local function fromISO8601(value)
         day = day,
         hour = hour,
         min = min,
-        ec = sec
+        sec = sec
     })
 end
 
