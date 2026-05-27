@@ -331,7 +331,8 @@ function Grimmory:onGrimmorySync(verbose)
                 _("Synchronizing to Grimmory"),
                 function()
                     should_terminate = true
-                end
+                end,
+                _("Are you sure you want to interrupt synchronization?")
             )
         end
 
