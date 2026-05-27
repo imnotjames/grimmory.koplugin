@@ -82,7 +82,9 @@ function GrimmoryBookResolver:getBookId(book_path, book_md5)
         book_md5 = util.partialMD5(book_path)
     end
 
-    local cache_value = self.md5_to_book_id_cache:get(book_md5:lower())
+    local cache_key = book_path .. ":" .. book_md5:lower()
+
+    local cache_value = self.md5_to_book_id_cache:get(cache_key)
     if cache_value ~= nil then
         logger:dbg("ID Cache hit", book_md5, book_path)
         if cache_value < 0 then
@@ -97,7 +99,7 @@ function GrimmoryBookResolver:getBookId(book_path, book_md5)
     local book_id = DocMetadata:getGrimmoryId(book_path) or -1
 
     if book_id >= 0 then
-        self.md5_to_book_id_cache:insert(book_md5:lower(), book_id)
+        self.md5_to_book_id_cache:insert(cache_key, book_id)
         return book_id
     end
 
@@ -125,7 +127,7 @@ function GrimmoryBookResolver:getBookId(book_path, book_md5)
         end
     end
 
-    self.md5_to_book_id_cache:insert(book_md5:lower(), book_id)
+    self.md5_to_book_id_cache:insert(cache_key, book_id)
 
     if book_id < 0 then
         return nil
