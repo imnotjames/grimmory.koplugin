@@ -362,6 +362,7 @@ end
 
 function DialogManager:showProgressDialog(title, dismiss_callback, dismiss_text)
     local dialog
+    local confirm_dialog
     local is_closing = false
 
     if dismiss_callback ~= nil then
@@ -377,7 +378,11 @@ function DialogManager:showProgressDialog(title, dismiss_callback, dismiss_text)
                 return
             end
 
-            local confirm_dialog = ConfirmBox:new({
+            if confirm_dialog then
+                UIManager:close(confirm_dialog)
+            end
+
+            confirm_dialog = ConfirmBox:new({
                 text = dismiss_text,
                 ok_callback = function()
                     pcall(dismiss_callback)
@@ -406,6 +411,11 @@ function DialogManager:showProgressDialog(title, dismiss_callback, dismiss_text)
 
     local function close_callback()
         is_closing = true
+
+        if confirm_dialog then
+            UIManager:close(confirm_dialog)
+        end
+
         UIManager:close(dialog)
     end
 
