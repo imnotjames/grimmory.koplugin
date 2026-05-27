@@ -410,10 +410,10 @@ function Grimmory:onGrimmorySync(verbose)
             if session_error_count > 0 or book_error_count > 0 then
                 message = T(
                     _(
-                        "Completed Grimmory sync\n" +
-                        "%1 session(s) recorded\n" +
-                        "%2 session(s) failed\n" +
-                        "%3 book(s) downloaded\n" +
+                        "Completed Grimmory sync\n" ..
+                        "%1 session(s) recorded\n" ..
+                        "%2 session(s) failed\n" ..
+                        "%3 book(s) downloaded\n" ..
                         "%4 book(s) failed"
                     ),
                     session_count,
