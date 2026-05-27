@@ -156,7 +156,11 @@ function GrimmoryAPI:getToken(base_uri, username, password)
     local ok, _, body = self:rawRequest("POST", uri, credentials)
 
     if not ok or not body then
-        return false, nil, nil, 0
+        if type(body) == "string" then
+            return false, body, body, 0
+        else
+            return false, nil, nil, 0
+        end
     end
 
     local expiry = tonumber(body["expires"]) or 0
@@ -215,7 +219,7 @@ function GrimmoryAPI:rawRequest(method, uri, data, headers, sink)
 
     if type(code) ~= "number" then
         logger:err("Non-numeric response code received:", tostring(code))
-        return false, 0, "Connection error: " .. tostring(code)
+        return false, 0, tostring(code)
     end
 
     if code >= 400 then
@@ -304,7 +308,7 @@ function GrimmoryAPI:testConnection(base_uri, username, password)
     )
 
     if not access_token_ok then
-        return false, _("Failed to retrieve access token")
+        return false, access_token
     end
 
     local headers = {}
@@ -336,6 +340,7 @@ function GrimmoryAPI:getBooks()
     )
 
     if not ok or type(body) == "string" then
+        logger:err("Could not get books", body)
         return ok, body
     end
 
@@ -380,6 +385,7 @@ function GrimmoryAPI:getShelves()
     )
 
     if not ok then
+        logger:err("Could not get shelves", body)
         return false, body
     end
 
@@ -427,6 +433,10 @@ function GrimmoryAPI:recordSession(
         request
     )
 
+    if not ok then
+        logger:err("Unable to record session", body)
+    end
+
     return ok, body
 end
 
@@ -437,6 +447,7 @@ function GrimmoryAPI:getKoreaderSync()
     )
 
     if not ok or not body then
+        logger:err("Could not get koreader sync status", body)
         return false, nil
     end
 
@@ -451,6 +462,7 @@ function GrimmoryAPI:setKoreaderSync(enabled)
     )
 
     if not ok then
+        logger:err("Could not set koreader sync status", body)
         return false, body
     end
 
@@ -467,6 +479,7 @@ function GrimmoryAPI:getKoreaderCredentials()
     )
 
     if not ok or not body then
+        logger:err("Could not get koreader credentials", body)
         return false, nil, nil
     end
 
