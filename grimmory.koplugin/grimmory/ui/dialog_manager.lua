@@ -139,7 +139,7 @@ function DialogManager:showTargetShelvesSettings()
             {
                 text = _("All Shelves"),
                 callback = function()
-                    logger:info("Set target shelves to All Shelves")
+                    logger:dbg("Set target shelves to All Shelves")
                     self.settings:setSyncTargetShelves({})
 
                     UIManager:broadcastEvent(Event:new("GrimmorySettingsChanged"))
@@ -169,7 +169,7 @@ function DialogManager:showTargetShelvesSettings()
                 {
                     text = uniqueShelfName,
                     callback = function()
-                        logger:info("Set target shelves to shelf ID", shelfId)
+                        logger:dbg("Set target shelves to shelf ID", shelfId)
                         self.settings:setSyncTargetShelves({ { id = shelfId, name = uniqueShelfName } })
 
                         UIManager:broadcastEvent(Event:new("GrimmorySettingsChanged"))

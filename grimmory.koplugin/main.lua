@@ -311,12 +311,10 @@ function Grimmory:isReadyToSync()
 end
 
 function Grimmory:onGrimmorySyncForegound()
-    logger:info("FOREGROUND")
     return self:onGrimmorySync(true)
 end
 
 function Grimmory:onGrimmorySyncBackground()
-    logger:info("BG")
     return self:onGrimmorySync(false)
 end
 

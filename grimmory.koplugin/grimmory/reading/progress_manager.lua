@@ -50,7 +50,7 @@ function ReadingProgressManager:getNewerProgressForBook(book_path)
     local remote_name, remote_id, remote_progress = self:getRemoteProgressForBook(book_path)
 
     if compareProgress(local_progress, remote_progress) <= 0 then
-        logger:info("No new progress for book:", book_path)
+        logger:dbg("No new progress for book:", book_path)
         return nil, nil, nil
     end
 
