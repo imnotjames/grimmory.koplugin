@@ -84,8 +84,15 @@ function GrimmorySynchronize:synchronizeSessions(callback)
         local total_seconds = session.end_time - session.start_time
         local total_pages = session.end_page - session.start_page + 1
 
-        if total_seconds < threshold_seconds and total_pages < threshold_pages then
-            logger:info("Session skipped for book", session.book_path)
+        if total_seconds < threshold_seconds then
+            logger:info("Skipped session below time threshold for book", session.book_path)
+            callback({
+                state = "session-skip",
+                bookPath = session.book_path,
+                since = session.end_time,
+            })
+        elseif total_pages < threshold_pages then
+            logger:info("Skipped session below page threshold for book", session.book_path)
             callback({
                 state = "session-skip",
                 bookPath = session.book_path,
