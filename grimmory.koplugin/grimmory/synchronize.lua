@@ -496,7 +496,23 @@ function GrimmorySynchronize:synchronizeProgress(callback)
     end
 end
 
+---@return boolean ok
+function GrimmorySynchronize:checkForHealthyServer()
+    local ok, version = self.api:getServerVersion()
+
+    if not ok then
+        logger:err("Failed to contact server, cannot sync:", version)
+        return false
+    end
+
+    return true
+end
+
 function GrimmorySynchronize:synchronizeAll(callback)
+    if not self:checkForHealthyServer() then
+        return
+    end
+
     -- Refresh so we pull fresh books
     self:refreshBooksFromAPI()
 
