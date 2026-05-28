@@ -4,7 +4,7 @@ local T = require("ffi/util").template
 local Event = require("ui/event")
 local UIManager = require("ui/uimanager")
 
-local PluginMetadata = require("_meta")
+local PluginMetadata = require("grimmory/plugin_metadata")
 local GrimmoryLogger = require("grimmory/logger")
 
 local logger = GrimmoryLogger:new()
@@ -24,8 +24,8 @@ end
 
 function GrimmoryMenu:getAboutMenu()
     -- These won't change after the plugin starts up
-    local repository = PluginMetadata.repository
-    local version = PluginMetadata.version
+    local repository = PluginMetadata.getRepository()
+    local version = PluginMetadata.getVersion()
 
     return {
         {

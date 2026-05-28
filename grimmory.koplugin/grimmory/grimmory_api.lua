@@ -4,7 +4,7 @@ local https = require("ssl.https")
 local json = require("json")
 local ltn12 = require("ltn12")
 
-local PluginMetadata = require("_meta")
+local PluginMetadata = require("grimmory/plugin_metadata")
 local GrimmoryLogger = require("grimmory/logger")
 
 local logger = GrimmoryLogger:new()
@@ -93,7 +93,7 @@ local function parseBook(book)
 end
 
 local function getUserAgent()
-    return "grimmory.koplugin/" .. PluginMetadata.version .. " (" .. PluginMetadata.repository .. ")"
+    return "grimmory.koplugin/" .. PluginMetadata.getVersion() .. " (" .. PluginMetadata.getRepository() .. ")"
 end
 
 ---@class GrimmoryAPI

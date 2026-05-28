@@ -7,7 +7,7 @@ local NetworkManager = require("ui/network/manager")
 local util = require("util")
 local sha2 = require("ffi/sha2")
 
-local PluginMetadata = require("_meta")
+local PluginMetadata = require("grimmory/plugin_metadata")
 local GrimmoryLogger = require("grimmory/logger")
 
 local logger = GrimmoryLogger:new()
@@ -138,7 +138,7 @@ function GrimmorySelfUpdater:isPendingRestart()
 end
 
 function GrimmorySelfUpdater:isUpdateAvailable()
-    local current_version = "v" .. PluginMetadata.version
+    local current_version = "v" .. PluginMetadata.getVersion()
     local latest_version = self.latest_known_version or current_version
 
     return isVersionLater(current_version, latest_version)
@@ -146,13 +146,18 @@ end
 
 function GrimmorySelfUpdater:getLatestReleaseVersion()
     -- Get the latest release version from github
-    local current_version = "v" .. PluginMetadata.version
+    local current_version = "v" .. PluginMetadata.getVersion()
     return self.latest_known_version or current_version
 end
 
 function GrimmorySelfUpdater:fetchLatestVersion()
+    if not PluginMetadata.hasRepository() then
+        logger:warn("Unknown repository - cannot fetch latest version")
+        return
+    end
+
     local ok, version = self.github_api:getLatestReleaseVersion(
-        PluginMetadata.repository
+        PluginMetadata.getRepository()
     )
 
     if not ok or not version then
@@ -168,6 +173,11 @@ function GrimmorySelfUpdater:downloadLatestRelease(progress_callback)
         return false, g("No latest release")
     end
 
+    if not PluginMetadata.hasRepository() then
+        logger:warn("Unknown repository - cannot fetch latest version")
+        return false, g("No repository defined")
+    end
+
     local download_path = self.release_cache_path ..
         "/plugin-" .. self.latest_known_version ..
         "-" .. os.time() .. ".zip"
@@ -180,7 +190,7 @@ function GrimmorySelfUpdater:downloadLatestRelease(progress_callback)
     end
 
     local ok, result, asset = self.github_api:downloadReleaseArchive(
-        PluginMetadata.repository,
+        PluginMetadata.getRepository(),
         self.latest_known_version,
         self.release_asset_name,
         download_path,
