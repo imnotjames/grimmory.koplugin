@@ -304,7 +304,7 @@ function ReadingSessionRepository:getReadingProgress(look_back)
                 local end_progress = 0
 
                 if page_count > 0 then
-                    end_progress = end_page / page_count
+                    end_progress = (end_page / page_count) * 100
                 end
 
                 ---@type ReadingSessionProgress
@@ -384,7 +384,7 @@ function ReadingSessionRepository:getReadingProgressForBook(book_md5, look_back)
             local end_progress = 0
 
             if page_count > 0 then
-                end_progress = end_page / page_count
+                end_progress = (end_page / page_count) * 100
             end
 
             return {
@@ -499,7 +499,11 @@ function ReadingSessionRepository:getSessions(since)
         -- to end of page?  But for now the simplest is to count
         -- progress as a point-in-time.
 
-        local read_progress = event.page / event.page_count
+        -- Percentage read via page count.
+        local read_progress = 0
+        if event.page_count > 0 then
+            read_progress = (event.page / event.page_count) * 100
+        end
 
         -- If existing session, we should update.
         -- We can make the assumption that these are in
