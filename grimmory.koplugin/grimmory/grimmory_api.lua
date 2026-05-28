@@ -157,8 +157,10 @@ function GrimmoryAPI:getToken(base_uri, username, password)
 
     if not ok or not body then
         if type(body) == "string" then
+            logger:err("Unable to get refresh token:", body)
             return false, body, body, 0
         else
+            logger:err("Unable to get refresh token:", "Unknown Error")
             return false, nil, nil, 0
         end
     end
@@ -329,6 +331,25 @@ function GrimmoryAPI:testConnection(base_uri, username, password)
     end
 
     return ok, body["current"]
+end
+
+---@return boolean ok
+---@return string | nil currnet_version
+function GrimmoryAPI:getServerVersion()
+    local ok, _, body = self:request(
+        "GET",
+        "/api/v1/version"
+    )
+
+    if not ok then
+        if body then
+            return false, tostring(body)
+        else
+            return false, nil
+        end
+    end
+
+    return ok, tostring(body["current"])
 end
 
 ---@return boolean ok
