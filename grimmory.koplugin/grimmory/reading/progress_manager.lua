@@ -135,7 +135,7 @@ function ReadingProgressManager:pushRemoteProgress(progress)
         device_id,
         progress.book_md5,
         progress.end_time,
-        progress.end_progress,
+        progress.end_progress / 100,
         progress.end_xpointer or progress.end_page
     )
 
@@ -192,7 +192,7 @@ function ReadingProgressManager:getRemoteProgressForBook(book_path)
         book_path = book_path,
         book_md5 = progress.document,
         end_time = progress.timestamp,
-        end_progress = progress.percentage,
+        end_progress = progress.percentage * 100,
         end_page = page,
         end_xpointer = xpointer,
     }
