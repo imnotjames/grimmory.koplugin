@@ -48,7 +48,8 @@ function DialogManager:toast(text, timeout)
 end
 
 function DialogManager:showConnectionSettings()
-    self.dialog = MultiInputDialog:new({
+    local dialog
+    dialog = MultiInputDialog:new({
         title = _("Grimmory Connection"),
         fields = {
             {
@@ -72,13 +73,13 @@ function DialogManager:showConnectionSettings()
                 text = _("Cancel"),
                 id = "close",
                 callback = function()
-                    UIManager:close(self.dialog)
+                    UIManager:close(dialog)
                 end,
             },
             {
                 text = _("Test"),
                 callback = function()
-                    local fields = self.dialog:getFields()
+                    local fields = dialog:getFields()
 
                     local ok, version = self.api:testConnection(
                         fields[1],
@@ -96,7 +97,7 @@ function DialogManager:showConnectionSettings()
             {
                 text = _("Apply"),
                 callback = function()
-                    local fields = self.dialog:getFields()
+                    local fields = dialog:getFields()
 
                     self.settings:setBaseUri(fields[1])
                     self.settings:setUsername(fields[2])
@@ -104,18 +105,19 @@ function DialogManager:showConnectionSettings()
 
                     UIManager:broadcastEvent(Event:new("GrimmorySettingsChanged"))
 
-                    UIManager:close(self.dialog)
+                    UIManager:close(dialog)
                 end,
             },
             },
         },
     })
 
-    UIManager:show(self.dialog)
-    self.dialog:onShowKeyboard()
+    UIManager:show(dialog)
+    dialog:onShowKeyboard()
 end
 
 function DialogManager:showTargetShelvesSettings()
+    local dialog
     local ok, result = self.api:getShelves()
 
     if not ok or type(result) == "string" then
@@ -129,7 +131,7 @@ function DialogManager:showTargetShelvesSettings()
             {
                 text = _("Cancel Selection"),
                 callback = function()
-                    UIManager:close(self.dialog)
+                    UIManager:close(dialog)
                 end,
             }
         },
@@ -142,7 +144,7 @@ function DialogManager:showTargetShelvesSettings()
 
                     UIManager:broadcastEvent(Event:new("GrimmorySettingsChanged"))
 
-                    UIManager:close(self.dialog)
+                    UIManager:close(dialog)
                 end,
             }
         }
@@ -172,23 +174,24 @@ function DialogManager:showTargetShelvesSettings()
 
                         UIManager:broadcastEvent(Event:new("GrimmorySettingsChanged"))
 
-                        UIManager:close(self.dialog)
+                        UIManager:close(dialog)
                     end
                 }
             }
         )
     end
 
-    self.dialog = ButtonDialog:new({
+    dialog = ButtonDialog:new({
         title = _("Target Shelf"),
         buttons = buttons,
     })
 
-    UIManager:show(self.dialog)
+    UIManager:show(dialog)
 end
 
 function DialogManager:showSyncFrequencySettings()
-    self.dialog = MultiInputDialog:new({
+    local dialog
+    dialog = MultiInputDialog:new({
         title = _("Periodic Sync Frequency"),
         fields = {
             {
@@ -203,30 +206,31 @@ function DialogManager:showSyncFrequencySettings()
                     text = _("Cancel"),
                     id = "close",
                     callback = function()
-                        UIManager:close(self.dialog)
+                        UIManager:close(dialog)
                     end,
                 },
                 {
                     text = _("Apply"),
                     callback = function()
-                        local fields = self.dialog:getFields()
+                        local fields = dialog:getFields()
 
                         self.settings:setSyncFrequency(math.max(1, fields[1]))
 
                         UIManager:broadcastEvent(Event:new("GrimmorySettingsChanged"))
 
-                        UIManager:close(self.dialog)
+                        UIManager:close(dialog)
                     end,
                 },
             },
         },
     })
 
-    UIManager:show(self.dialog)
+    UIManager:show(dialog)
 end
 
 function DialogManager:showSessionThresholdSettings()
-    self.dialog = MultiInputDialog:new({
+    local dialog
+    dialog = MultiInputDialog:new({
         title = _("Session Thresholds"),
         fields = {
             {
@@ -246,32 +250,33 @@ function DialogManager:showSessionThresholdSettings()
                 text = _("Cancel"),
                 id = "close",
                 callback = function()
-                    UIManager:close(self.dialog)
+                    UIManager:close(dialog)
                 end,
             },
             {
                 text = _("Apply"),
                 callback = function()
-                    local fields = self.dialog:getFields()
+                    local fields = dialog:getFields()
 
                     self.settings:setSessionThresholdSeconds(math.max(0, fields[1]))
                     self.settings:setSessionThresholdPages(math.max(0, fields[2]))
 
                     UIManager:broadcastEvent(Event:new("GrimmorySettingsChanged"))
 
-                    UIManager:close(self.dialog)
+                    UIManager:close(dialog)
                 end,
             },
             },
         },
     })
 
-    UIManager:show(self.dialog)
-    self.dialog:onShowKeyboard()
+    UIManager:show(dialog)
+    dialog:onShowKeyboard()
 end
 
 function DialogManager:showDownloadDirectorySettings()
-    self.dialog = PathChooser:new({
+    local dialog
+    dialog = PathChooser:new({
         title = "Download Directory",
         select_file = false,
         show_files = false,
@@ -281,10 +286,11 @@ function DialogManager:showDownloadDirectorySettings()
         end,
     })
 
-    UIManager:show(self.dialog)
+    UIManager:show(dialog)
 end
 
 function DialogManager:showPluginUpdateCheck()
+    local dialog
     local latest_version = self.updater:getLatestReleaseVersion()
     local is_update_available = self.updater:isUpdateAvailable()
 
@@ -294,7 +300,7 @@ function DialogManager:showPluginUpdateCheck()
         update_button_text = T(_("Update to %1"), latest_version)
     end
 
-    self.dialog = ButtonDialog:new({
+    dialog = ButtonDialog:new({
         title = T(_("Update Grimmory Plugin\nLatest release is %1"), latest_version),
         buttons = {
             {
@@ -302,7 +308,7 @@ function DialogManager:showPluginUpdateCheck()
                     text = update_button_text,
                     callback = function()
                         if is_update_available then
-                            UIManager:close(self.dialog)
+                            UIManager:close(dialog)
 
                             self:showPluginUpdater()
                         end
@@ -312,7 +318,7 @@ function DialogManager:showPluginUpdateCheck()
                     text = _("Check for Updates"),
                     callback = function()
                         self.updater:fetchLatestVersion()
-                        UIManager:close(self.dialog)
+                        UIManager:close(dialog)
                         self:showPluginUpdateCheck()
                     end,
                 },
@@ -321,14 +327,14 @@ function DialogManager:showPluginUpdateCheck()
                 {
                     text = _("Close"),
                     callback = function()
-                        UIManager:close(self.dialog)
+                        UIManager:close(dialog)
                     end,
                 },
             },
         },
     })
 
-    UIManager:show(self.dialog)
+    UIManager:show(dialog)
 end
 
 function DialogManager:showPluginUpdater()
