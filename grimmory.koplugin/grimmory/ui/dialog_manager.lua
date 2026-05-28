@@ -391,7 +391,7 @@ function DialogManager:showProgressDialog(title, dismiss_callback, dismiss_text)
             text = dismiss_text,
             ok_callback = function()
                 pcall(dismiss_callback)
-                UIManager:close(dialog)
+                dialog:close()
             end,
         })
 
@@ -406,7 +406,7 @@ function DialogManager:showProgressDialog(title, dismiss_callback, dismiss_text)
         dismiss_callback = confirm_dismiss,
     })
 
-    UIManager:show(dialog)
+    dialog:show()
 
     local function update_callback(progress, total_progress)
         dialog.progress_max = total_progress
@@ -420,7 +420,7 @@ function DialogManager:showProgressDialog(title, dismiss_callback, dismiss_text)
             UIManager:close(confirm_dialog)
         end
 
-        UIManager:close(dialog)
+        dialog:close()
     end
 
     return update_callback, close_callback
