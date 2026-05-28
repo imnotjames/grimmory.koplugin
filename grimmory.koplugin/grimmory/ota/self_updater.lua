@@ -66,6 +66,11 @@ local function findPluginInArchive(reader)
 end
 
 ---@param version string
+---@return number major
+---@return number minor
+---@return number patch
+---@return string | nil prerelease
+---@return string | nil build
 local function parseVersion(version)
     local major, minor, patch, labels = tostring(version):match("v?(%d+)%.(%d+)%.(%d+)(.*)")
 
@@ -85,7 +90,7 @@ local function parseVersion(version)
         end
     end
 
-    return tonumber(major), tonumber(minor), tonumber(patch), prerelease, build
+    return tonumber(major) or 0, tonumber(minor) or 0, tonumber(patch) or 0, prerelease, build
 end
 
 ---@param version_a string
