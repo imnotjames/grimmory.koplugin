@@ -8,6 +8,7 @@ local T = require("ffi/util").template
 
 local Dispatcher = require("dispatcher")
 local UIManager = require("ui/uimanager")
+local Event = require("ui/event")
 local WidgetContainer = require("ui/widget/container/widgetcontainer")
 
 local GrimmoryBookResolver = require("grimmory/book_resolver")
@@ -381,6 +382,15 @@ function Grimmory:onGrimmorySync(verbose)
                     session_error_count = session_error_count + 1
                 elseif progress.state == "book-downloaded" then
                     book_count = book_count + 1
+
+                    if book_count % 20 then
+                        -- If we're updating a lot of books we should
+                        -- emit a refresh event every once in a while
+                        -- so background refresh sees these come
+                        -- through quickly
+                        UIManager:broadcastEvent(Event:new("RefreshContent"))
+                    end
+
                 elseif progress.state == "book-error" then
                     book_error_count = book_error_count + 1
                 end
@@ -411,6 +421,12 @@ function Grimmory:onGrimmorySync(verbose)
             end
 
             return
+        end
+
+        if book_count > 0 then
+            -- If we have any books downloaded we need to emit a refresh
+            -- event so the file manager knows it should refresh
+            UIManager:broadcastEvent(Event:new("RefreshContent"))
         end
 
         if verbose then
