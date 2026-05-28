@@ -436,7 +436,7 @@ function DialogManager:showApplyProgressConfirmation(progress)
     local dialog = ConfirmBox:new({
         text = T(
             _("Go to latest location %1% from Grimmory?"),
-            tostring(progress.end_progress * 100)
+            tostring(progress.end_progress)
         ),
         ok_callback = function()
             self.reading_progress_manager:applyProgress(progress)
