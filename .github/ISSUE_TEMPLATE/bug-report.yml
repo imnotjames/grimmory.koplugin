@@ -1,4 +1,5 @@
 name: Bug report
+type: Bug
 description: Create a bug report to help us improve the plugin
 body:
   - type: markdown
