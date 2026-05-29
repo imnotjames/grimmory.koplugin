@@ -1,0 +1,1 @@
+ALTER TABLE book ADD grimmory_id integer NULL;

@@ -31,7 +31,7 @@ end
 ---@class ReadingProgressManager
 ---@field ui any
 ---@field api GrimmoryAPI
----@field reading_sessions ReadingSessionRepository
+---@field repository GrimmoryLocalRepository
 ---@field settings GrimmorySettings
 ---@field private koreader_auth_id string | nil
 ---@field private koreader_auth_secret_md5 string | nil
@@ -69,9 +69,9 @@ function ReadingProgressManager:getLocalProgressForBook(book_path)
         -- This is a bit of a hack to handle the fact that the page event
         -- is fired before the reader is ready.
         -- Look back 30 seconds so the "current" session isn't counted
-        return self.reading_sessions:getReadingProgressForBook(partial_md5, 30)
+        return self.repository:getReadingProgressForBook(partial_md5, 30)
     else
-        return self.reading_sessions:getReadingProgressForBook(partial_md5)
+        return self.repository:getReadingProgressForBook(partial_md5)
     end
 end
 

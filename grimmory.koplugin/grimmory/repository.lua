@@ -24,6 +24,7 @@ end
 ---| "session-end"
 
 ---@class ReadingSession
+---@field grimmory_id number | nil
 ---@field book_md5 string
 ---@field book_path string
 ---@field start_time number
@@ -39,6 +40,7 @@ end
 ---@class ReadingSessionEvent
 ---@field session_id number
 ---@field event_type ReadingSessionEventType
+---@field grimmory_id number | nil
 ---@field book_md5 string
 ---@field book_path string
 ---@field timestamp number
@@ -47,6 +49,7 @@ end
 ---@field xpointer string | nil
 
 ---@class ReadingSessionProgress
+---@field grimmory_id number | nil
 ---@field book_md5 string
 ---@field book_path string
 ---@field end_time number
@@ -54,15 +57,15 @@ end
 ---@field end_page number | nil
 ---@field end_xpointer string | nil
 
----@class ReadingSessionRepository
+---@class GrimmoryLocalRepository
 ---@field migrations_path string
----@field sessions_database_path string
-local ReadingSessionRepository = {
-    migrations_path = getPluginPath() .. "/grimmory/reading/migrations/",
-    sessions_database_path =  DataStorage:getSettingsDir() .. "/grimmory_sessions.sqlite3",
+---@field database_path string
+local GrimmoryLocalRepository = {
+    migrations_path = getPluginPath() .. "/grimmory/migrations/",
+    database_path =  DataStorage:getSettingsDir() .. "/grimmory.sqlite3",
 }
 
-function ReadingSessionRepository:new(o)
+function GrimmoryLocalRepository:new(o)
     o = o or {}
     setmetatable(o, self)
     self.__index = self
@@ -70,7 +73,7 @@ function ReadingSessionRepository:new(o)
     return o
 end
 
-function ReadingSessionRepository:getMigrations()
+function GrimmoryLocalRepository:getMigrations()
     if not util.directoryExists(self.migrations_path) then
         return {}
     end
@@ -89,7 +92,7 @@ function ReadingSessionRepository:getMigrations()
     return sql_files
 end
 
-function ReadingSessionRepository:runMigrations()
+function GrimmoryLocalRepository:runMigrations()
     local sql_files = self:getMigrations()
 
     for _, sql_filepath in ipairs(sql_files) do
@@ -97,7 +100,7 @@ function ReadingSessionRepository:runMigrations()
         logger:dbg("Running SQL file path:", sql_filepath)
 
         if sql ~= nil then
-            self:withSessionDatabase(
+            self:withDatabase(
                 function(database)
                     database:exec(sql)
                 end,
@@ -107,7 +110,7 @@ function ReadingSessionRepository:runMigrations()
     end
 end
 
-function ReadingSessionRepository:init()
+function GrimmoryLocalRepository:init()
     self:runMigrations()
 end
 
@@ -116,13 +119,13 @@ end
 ---@param flags? "ro" | "rw" | "rwc"
 ---@return boolean ok
 ---@return T result
-function ReadingSessionRepository:withSessionDatabase(callback, flags)
+function GrimmoryLocalRepository:withDatabase(callback, flags)
     if flags == nil then
         flags = "ro"
     end
 
     local database = SQ3.open(
-        self.sessions_database_path,
+        self.database_path,
         flags
     )
     database:set_busy_timeout(1000)
@@ -135,12 +138,13 @@ function ReadingSessionRepository:withSessionDatabase(callback, flags)
 end
 
 ---@param book_path string
+---@param grimmory_id number | nil
 ---@return boolean ok
 ---@return integer | nil book_id
-function ReadingSessionRepository:upsertBook(book_path)
+function GrimmoryLocalRepository:upsertBook(book_path, grimmory_id)
     local partial_md5 = util.partialMD5(book_path)
 
-    local ok, book_id = self:withSessionDatabase(
+    local ok, book_id = self:withDatabase(
         function(conn)
             -- Remember that `OR IGNORE` will ignore almost all
             -- data type or constraint failures.
@@ -160,7 +164,10 @@ function ReadingSessionRepository:upsertBook(book_path)
             -- Cannot use last row ID because it's possible this book
             -- already had existed.
             local select_stmt = conn:prepare([[
-                SELECT id FROM book
+                SELECT
+                    id,
+                    grimmory_id
+                FROM book
                 WHERE book_path = ? AND partial_md5 = ?
             ]])
 
@@ -169,28 +176,83 @@ function ReadingSessionRepository:upsertBook(book_path)
             select_stmt:close()
 
             if not row then
-                logger:err("Error during re-select insert")
-                return error()
+                return error("Error during re-select insert")
             end
 
-            return tonumber(row[1])
+            local book_id = tonumber(row[1])
+            local existing_grimmory_id = tonumber(row[2])
+
+            if existing_grimmory_id ~= grimmory_id and grimmory_id ~= nil then
+                local update_stmt = conn:prepare([[
+                    UPDATE book
+                    SET
+                        grimmory_id = ?
+                    WHERE
+                        id = ?
+                ]])
+
+                update_stmt:bind(grimmory_id, book_id)
+                update_stmt:step()
+                update_stmt:close()
+            end
+
+            return book_id
         end,
         "rw"
     )
 
     if not ok or not book_id then
-        logger:err("Failed to upsert book:", book_id)
+        logger:err("Failed to upsert book:", book_path, "-", book_id)
         return false, nil
     end
 
     return true, book_id
 end
 
+---@param grimmory_id number
+---@return boolean ok
+---@return string | nil book_path
+---@return string | nil book_md5
+function GrimmoryLocalRepository:getBookInfo(grimmory_id)
+    local ok, book = self:withDatabase(
+        function(conn)
+            local select_stmt = conn:prepare([[
+                SELECT
+                    book_path,
+                    partial_md5
+                FROM book
+                WHERE
+                    grimmory_id = ?
+            ]])
+
+            select_stmt:bind(grimmory_id)
+            local row = select_stmt:step()
+            select_stmt:close()
+
+            if not row then
+                return error("Not Found")
+            end
+
+            return {
+                book_path = row[1],
+                book_md5 = row[2],
+            }
+        end
+    )
+
+    if not ok or not book then
+        logger:err("Failed to find book:", grimmory_id, "-", book)
+        return false, nil, nil
+    end
+
+    return true, book.book_path, book.book_md5
+end
+
 ---@param book_id number
 ---@return boolean ok
 ---@return integer | nil session_id
-function ReadingSessionRepository:insertSession(book_id)
-    local ok, session_id = self:withSessionDatabase(
+function GrimmoryLocalRepository:insertSession(book_id)
+    local ok, session_id = self:withDatabase(
         function(conn)
             local insert_stmt = conn:prepare([[
                 INSERT INTO book_session
@@ -224,8 +286,8 @@ end
 ---@param current_page number
 ---@param page_count number
 ---@param xpointer string | nil
-function ReadingSessionRepository:insertBookEvent(session_id, event_type, current_page, page_count, xpointer)
-    local ok, result = self:withSessionDatabase(
+function GrimmoryLocalRepository:insertBookEvent(session_id, event_type, current_page, page_count, xpointer)
+    local ok, result = self:withDatabase(
         function(conn)
             local stmt = conn:prepare([[
                 INSERT INTO book_event
@@ -263,11 +325,12 @@ end
 
 ---@param look_back number | nil
 ---@return ReadingSessionProgress[] progress
-function ReadingSessionRepository:getReadingProgress(look_back)
-    local ok, results = ReadingSessionRepository:withSessionDatabase(
+function GrimmoryLocalRepository:getReadingProgress(look_back)
+    local ok, results = self:withDatabase(
         function(conn)
             local stmt = conn:prepare([[
                 SELECT
+                    book.grimmory_id,
                     book.book_path,
                     book.partial_md5,
 
@@ -297,10 +360,9 @@ function ReadingSessionRepository:getReadingProgress(look_back)
             local results = {}
 
             for row in stmt:rows() do
-                local end_time = tonumber(row[3], 10) or 0
-
-                local end_page = tonumber(row[4]) or 0
-                local page_count = tonumber(row[5]) or 0
+                local end_time = tonumber(row[4], 10) or 0
+                local end_page = tonumber(row[5]) or 0
+                local page_count = tonumber(row[6]) or 0
 
                 local end_progress = 0
 
@@ -310,12 +372,13 @@ function ReadingSessionRepository:getReadingProgress(look_back)
 
                 ---@type ReadingSessionProgress
                 local progress = {
-                    book_path = row[1],
-                    book_md5 = row[2],
+                    grimmory_id = tonumber(row[1]),
+                    book_path = row[2],
+                    book_md5 = row[3],
                     end_time = end_time,
                     end_page = end_page,
                     end_progress = end_progress,
-                    end_xpointer = row[6],
+                    end_xpointer = row[7],
                 }
                 table.insert(results, progress)
             end
@@ -337,11 +400,12 @@ end
 ---@param book_md5 string
 ---@param look_back number | nil
 ---@return ReadingSessionProgress | nil progress
-function ReadingSessionRepository:getReadingProgressForBook(book_md5, look_back)
-    local ok, result = self:withSessionDatabase(
+function GrimmoryLocalRepository:getReadingProgressForBook(book_md5, look_back)
+    local ok, result = self:withDatabase(
         function(conn)
             local stmt = conn:prepare([[
                 SELECT
+                    book.grimmory_id,
                     book.book_path,
                     book.partial_md5,
 
@@ -377,10 +441,10 @@ function ReadingSessionRepository:getReadingProgressForBook(book_md5, look_back)
                 return nil
             end
 
-            local end_time = tonumber(row[3], 10) or 0
+            local end_time = tonumber(row[4], 10) or 0
 
-            local end_page = tonumber(row[4]) or 0
-            local page_count = tonumber(row[5]) or 0
+            local end_page = tonumber(row[5]) or 0
+            local page_count = tonumber(row[6]) or 0
 
             local end_progress = 0
 
@@ -389,12 +453,13 @@ function ReadingSessionRepository:getReadingProgressForBook(book_md5, look_back)
             end
 
             return {
-                    book_path = row[1],
-                    book_md5 = row[2],
+                    grimmory_id = row[1],
+                    book_path = row[2],
+                    book_md5 = row[3],
                     end_time = end_time,
                     end_page = end_page,
                     end_progress = end_progress,
-                    end_xpointer = row[6],
+                    end_xpointer = row[7],
             }
         end
     )
@@ -409,11 +474,12 @@ end
 
 ---@param since integer
 ---@return ReadingSessionEvent[]
-function ReadingSessionRepository:getEvents(since)
-    local ok, results = self:withSessionDatabase(
+function GrimmoryLocalRepository:getEvents(since)
+    local ok, results = self:withDatabase(
         function(conn)
             local stmt = conn:prepare([[
                 SELECT
+                    b.grimmory_id,
                     b.book_path,
                     b.partial_md5,
 
@@ -438,14 +504,15 @@ function ReadingSessionRepository:getEvents(since)
             for row in stmt:rows() do
                 ---@type ReadingSessionEvent
                 local event = {
-                    book_path = row[1],
-                    book_md5 = row[2],
-                    session_id = row[3],
-                    event_type = row[4],
-                    timestamp = tonumber(row[5]) or 0,
-                    page = tonumber(row[6]) or 0,
-                    page_count = tonumber(row[7]) or 0,
-                    xpointer = row[8],
+                    grimmory_id = tonumber(row[1]),
+                    book_path = row[2],
+                    book_md5 = row[3],
+                    session_id = row[4],
+                    event_type = row[5],
+                    timestamp = tonumber(row[6]) or 0,
+                    page = tonumber(row[7]) or 0,
+                    page_count = tonumber(row[8]) or 0,
+                    xpointer = row[9],
                 }
 
                 table.insert(results, event)
@@ -491,11 +558,11 @@ end
 
 ---@param since integer
 ---@return ReadingSession[]
-function ReadingSessionRepository:getSessions(since)
+function GrimmoryLocalRepository:getSessions(since)
     ---@type ReadingSession[]
     local sessions = {}
 
-    for _, event in ipairs(ReadingSessionRepository:getEvents(since)) do
+    for _, event in ipairs(self:getEvents(since)) do
         -- Eventually we could figure out progress from start of page
         -- to end of page?  But for now the simplest is to count
         -- progress as a point-in-time.
@@ -533,6 +600,7 @@ function ReadingSessionRepository:getSessions(since)
             -- If new session, create a new session record
             ---@type ReadingSession
             local new_session = {
+                grimmory_id = event.grimmory_id,
                 book_md5 = event.book_md5,
                 book_path = event.book_path,
                 start_time = event.timestamp,
@@ -560,4 +628,4 @@ function ReadingSessionRepository:getSessions(since)
     return sessions
 end
 
-return ReadingSessionRepository
+return GrimmoryLocalRepository

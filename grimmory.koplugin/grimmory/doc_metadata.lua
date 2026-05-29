@@ -85,23 +85,6 @@ function DocMetadata:setIdentifier(path, type, identifier)
     settings:flush()
 end
 
-function DocMetadata:getGrimmoryId(path)
-    local value = self:getIdentifier(
-        path,
-        { "grimmory" }
-    )
-
-    if value == nil then
-        return nil
-    end
-
-    return tonumber(value)
-end
-
-function DocMetadata:setGrimmoryId(path, grimmory_id)
-    self:setIdentifier(path, "grimmory", grimmory_id)
-end
-
 function DocMetadata:getISBN(path)
     return self:getIdentifier(
         path,

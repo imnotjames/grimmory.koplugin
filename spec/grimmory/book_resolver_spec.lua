@@ -63,7 +63,7 @@ describe("GrimmoryBookResolver", function()
     it("returns nil with no match", function()
         local resolver = GrimmoryBookResolver:new()
 
-        local actual = resolver:getBookId("example-path", "example-md5")
+        local actual = resolver:getBookId("example-path")
 
         assert.is_nil(actual)
     end)
@@ -80,7 +80,7 @@ describe("GrimmoryBookResolver", function()
             }
         })
 
-        local actual = resolver:getBookId("example-path", "example-md5")
+        local actual = resolver:getBookId("example-path")
 
         assert.are.equal(actual, 1)
     end)

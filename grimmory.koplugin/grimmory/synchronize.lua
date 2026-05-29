@@ -1,13 +1,12 @@
 local ReadCollection = require("readcollection")
 local util = require("util")
 
-local DocMetadata = require("grimmory/doc_metadata")
 local GrimmoryLogger = require("grimmory/logger")
 
 local logger = GrimmoryLogger:new()
 
 ---@class GrimmorySynchronize
----@field reading_sessions ReadingSessionRepository
+---@field repository GrimmoryLocalRepository
 ---@field reading_progress_manager ReadingProgressManager
 ---@field settings GrimmorySettings
 ---@field api GrimmoryAPI
@@ -75,7 +74,7 @@ function GrimmorySynchronize:synchronizeSessions(callback)
     local since = self.settings:getSynchronizedUntil()
     logger:info("Synchronizing sessions since", since)
 
-    local sessions = self.reading_sessions:getSessions(since)
+    local sessions = self.repository:getSessions(since)
 
     local threshold_pages = self.settings:getSessionThresholdPages()
     local threshold_seconds = self.settings:getSessionThresholdSeconds()
@@ -101,6 +100,7 @@ function GrimmorySynchronize:synchronizeSessions(callback)
         else
             logger:dbg(
                 "Recording session",
+                session.grimmory_id,
                 session.book_path,
                 session.start_time,
                 session.end_time,
@@ -110,15 +110,13 @@ function GrimmorySynchronize:synchronizeSessions(callback)
                 session.end_xpointer
             )
 
-            local book_id = self.book_resolver:getBookId(session.book_path, session.book_md5)
-
             local ok = false
             local body
-            if book_id == nil then
+            if session.grimmory_id == nil then
                 body = "Could not match local book to Grimmory"
             else
                 ok, body = self.api:recordSession(
-                    book_id,
+                    session.grimmory_id,
                     session.start_time,
                     session.end_time,
                     session.start_progress,
@@ -331,6 +329,11 @@ end
 
 ---@param book Book
 function GrimmorySynchronize:getBookDownloadPath(book)
+    local existing_book_ok, existing_book_path = self.repository:getBookInfo(book.id)
+    if existing_book_ok and existing_book_path then
+        return existing_book_path
+    end
+
     local download_directory = self.settings:getSyncDownloadDirectory()
 
     if not download_directory or download_directory == "" then
@@ -464,17 +467,17 @@ function GrimmorySynchronize:synchronizeBooks(callback)
             end
         end
 
-        if book_exists then
+        if book_exists and download_path then
             -- After we're done, if the book exists we should attach it
             -- to associated shelves.
             self:associateWithShelves(download_path, book.shelves)
-            DocMetadata:setGrimmoryId(download_path, book.id)
+            self.repository:upsertBook(download_path, book.id)
         end
     end
 end
 
 function GrimmorySynchronize:synchronizeProgress(callback)
-    local reading_progress_records = self.reading_sessions:getReadingProgress()
+    local reading_progress_records = self.repository:getReadingProgress()
 
     -- From Koreader to grimmory
     for _, progress in ipairs(reading_progress_records) do

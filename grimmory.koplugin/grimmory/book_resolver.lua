@@ -77,10 +77,8 @@ function GrimmoryBookResolver:refreshBooks(books)
     end
 end
 
-function GrimmoryBookResolver:getBookId(book_path, book_md5)
-    if book_md5 == nil then
-        book_md5 = util.partialMD5(book_path)
-    end
+function GrimmoryBookResolver:getBookId(book_path)
+    local book_md5 = util.partialMD5(book_path)
 
     local cache_key = book_path .. ":" .. book_md5:lower()
 
@@ -96,13 +94,6 @@ function GrimmoryBookResolver:getBookId(book_path, book_md5)
 
     logger:dbg("ID Cache miss", book_md5, book_path)
 
-    local book_id = DocMetadata:getGrimmoryId(book_path) or -1
-
-    if book_id >= 0 then
-        self.md5_to_book_id_cache:insert(cache_key, book_id)
-        return book_id
-    end
-
     local isbn = DocMetadata:getISBN(book_path)
     local asin = DocMetadata:getASIN(book_path)
     local title = DocMetadata:getTitle(book_path)
@@ -114,6 +105,8 @@ function GrimmoryBookResolver:getBookId(book_path, book_md5)
 
     local title_id = getTitleIdentifier(title, author)
     local _, filename = util.splitFilePathName(book_path)
+
+    local book_id = -1
 
     if identifiers ~= nil then
         if isbn and identifiers["isbn:" .. isbn] then

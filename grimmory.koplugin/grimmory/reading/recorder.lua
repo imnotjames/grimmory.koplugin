@@ -3,7 +3,7 @@ local GrimmoryLogger = require("grimmory/logger")
 local logger = GrimmoryLogger:new()
 
 ---@class ReadingRecorder
----@field repository ReadingSessionRepository
+---@field repository GrimmoryLocalRepository
 ---@field ui any
 ---@field last_page integer | nil
 ---@field session_book_path string | nil

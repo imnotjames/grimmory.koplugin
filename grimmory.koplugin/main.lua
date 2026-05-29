@@ -24,7 +24,7 @@ local GrimmorySelfUpdater = require("grimmory/ota/self_updater")
 local GithubAPI = require("grimmory/ota/github_api")
 local GrimmoryLogger = require("grimmory/logger")
 local GrimmoryReadingRecorder = require("grimmory/reading/recorder")
-local GrimmoryReadingSessions = require("grimmory/reading/repository")
+local GrimmoryLocalRepository = require("grimmory/repository")
 local GrimmoryReadingProgressManager = require("grimmory/reading/progress_manager")
 
 
@@ -66,12 +66,12 @@ function Grimmory:init()
     self.scheduler = GrimmoryScheduler:new()
     self.settings = GrimmorySettings:new()
 
-    self.reading_sessions = GrimmoryReadingSessions:new({
+    self.repository = GrimmoryLocalRepository:new({
         settings = self.settings,
     })
 
     self.reading_recorder = GrimmoryReadingRecorder:new({
-        repository = self.reading_sessions,
+        repository = self.repository,
         settings = self.settings,
         ui = self.ui,
     })
@@ -92,7 +92,7 @@ function Grimmory:init()
         ui = self.ui,
         api = self.api,
         settings = self.settings,
-        reading_sessions = self.reading_sessions,
+        repository = self.repository,
     })
 
     self.dialog_manager = GrimmoryDialogManager:new({
@@ -114,7 +114,7 @@ function Grimmory:init()
 
     self.synchronizer = GrimmorySynchronize:new({
         settings = self.settings,
-        reading_sessions = self.reading_sessions,
+        repository = self.repository,
         api = self.api,
         book_resolver = self.book_resolver,
         reading_progress_manager = self.reading_progress_manager,
