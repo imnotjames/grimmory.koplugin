@@ -353,6 +353,8 @@ function Grimmory:onGrimmorySync(verbose)
             )
         end
 
+        self.menu:onGrimmorySyncStart(function() should_terminate = true end)
+
         local indeterminate_progress = 0
         local session_count = 0
         local session_error_count = 0
@@ -466,6 +468,7 @@ function Grimmory:onGrimmorySync(verbose)
         end
 
         self.is_synchronizing = false
+        self.menu:onGrimmorySyncComplete()
     end
 
     self.executor:wrap(function()
