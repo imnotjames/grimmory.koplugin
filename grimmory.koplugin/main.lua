@@ -365,7 +365,7 @@ function Grimmory:onGrimmorySync(verbose)
                 elseif progress.state == "book-downloaded" then
                     book_count = book_count + 1
 
-                    if book_count % 20 then
+                    if book_count % 20 == 0 then
                         -- If we're updating a lot of books we should
                         -- emit a refresh event every once in a while
                         -- so background refresh sees these come
