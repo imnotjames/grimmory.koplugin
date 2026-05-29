@@ -166,6 +166,7 @@ function ReadingSessionRepository:upsertBook(book_path)
 
             select_stmt:bind(book_path, partial_md5)
             local row = select_stmt:step()
+            select_stmt:close()
 
             if not row then
                 logger:err("Error during re-select insert")
