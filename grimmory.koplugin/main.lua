@@ -313,13 +313,17 @@ function Grimmory:onGrimmorySync(verbose)
         logger:info("Synchronizing to Grimmory")
 
         self.is_synchronizing = true
-        self.menu:onGrimmorySyncStart(function() should_terminate = true end)
+        self.menu:onGrimmorySyncStart(function()
+            self.is_synchronizing = false
+            should_terminate = true
+        end)
 
         local update_callback, close_callback
         if verbose then
             update_callback, close_callback = self.dialog_manager:showProgressDialog(
                 _("Synchronizing to Grimmory"),
                 function()
+                    self.is_synchronizing = false
                     should_terminate = true
                 end,
                 _("Are you sure you want to interrupt synchronization?")
@@ -379,6 +383,9 @@ function Grimmory:onGrimmorySync(verbose)
             end
         )
 
+        self.is_synchronizing = false
+        self.menu:onGrimmorySyncComplete()
+
         if close_callback then
             pcall(close_callback)
         end
@@ -402,8 +409,6 @@ function Grimmory:onGrimmorySync(verbose)
                 end
             end
 
-            self.is_synchronizing = false
-            self.menu:onGrimmorySyncComplete()
             return
         end
 
@@ -439,9 +444,6 @@ function Grimmory:onGrimmorySync(verbose)
 
             self.dialog_manager:toast(message)
         end
-
-        self.is_synchronizing = false
-        self.menu:onGrimmorySyncComplete()
     end
 
     self.executor:wrap(function()
