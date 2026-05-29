@@ -43,6 +43,7 @@ local Grimmory = WidgetContainer:extend{
     periodic_sync_update = nil,
     release_check_cancel = nil,
     menu = nil,
+    is_synchronizing = false,
 }
 
 function Grimmory:onDispatcherRegisterActions()
@@ -308,6 +309,11 @@ function Grimmory:isReadyToSync()
         return false
     end
 
+    if self.is_synchronizing then
+        logger:info("Synchronization is already happening, not ready to sync again")
+        return false
+    end
+
     return true
 end
 
@@ -323,6 +329,8 @@ function Grimmory:onGrimmorySync(verbose)
     if not self:isReadyToSync() then
         return false
     end
+
+    self.is_synchronizing = true
 
     local function sync_callback()
         if not self.wifi_manager:isConnected() then
@@ -459,6 +467,7 @@ function Grimmory:onGrimmorySync(verbose)
             self.dialog_manager:toast(message)
         end
 
+        self.is_synchronizing = false
         self.menu:onGrimmorySyncComplete()
     end
 
