@@ -368,8 +368,9 @@ function Grimmory:onGrimmorySync(verbose)
                 end
 
                 indeterminate_progress = (indeterminate_progress + 1) % 20
-                update_callback(indeterminate_progress, 20)
-
+                if update_callback ~= nil then
+                    pcall(update_callback, indeterminate_progress, 20)
+                end
 
                 if progress.since then
                     -- Update since
