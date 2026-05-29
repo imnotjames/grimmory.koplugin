@@ -2,6 +2,7 @@ local _ = require("gettext")
 local T = require("ffi/util").template
 
 local Event = require("ui/event")
+local ConfirmBox = require("ui/widget/confirmbox")
 local UIManager = require("ui/uimanager")
 
 local PluginMetadata = require("grimmory/plugin_metadata")
@@ -13,6 +14,7 @@ local logger = GrimmoryLogger:new()
 ---@field settings GrimmorySettings
 ---@field dialog_manager DialogManager
 ---@field updater GrimmorySelfUpdater
+---@field interrupt_sync function
 local GrimmoryMenu = {}
 
 function GrimmoryMenu:new(o)
@@ -20,6 +22,14 @@ function GrimmoryMenu:new(o)
     setmetatable(o, self)
     self.__index = self
     return o
+end
+
+function GrimmoryMenu:onGrimmorySyncStart(interrupt_sync_callback)
+    self.interrupt_sync = interrupt_sync_callback
+end
+
+function GrimmoryMenu:onGrimmorySyncComplete()
+    self.interrupt_sync = nil
 end
 
 function GrimmoryMenu:getAboutMenu()
@@ -145,22 +155,7 @@ function GrimmoryMenu:getSyncOptionsMenu()
 end
 
 function GrimmoryMenu:getTopMenu()
-    return  {
-        {
-            text = _("Force Sync Now"),
-            enabled_func = function()
-                if self.settings:getBaseUri() == "" then
-                    logger:info("BaseURI is not configured, cannot sync")
-                    return false
-                end
-
-                return true
-            end,
-            callback = function()
-                UIManager:broadcastEvent(Event:new("GrimmorySync", true))
-            end,
-            separator = true,
-        },
+    local menu = {
         {
             text = _("Connection Settings"),
             callback = function()
@@ -251,13 +246,57 @@ function GrimmoryMenu:getTopMenu()
             sub_item_table = self:getAboutMenu(),
         },
     }
+
+    if self.interrupt_sync == nil then
+        table.insert(
+            menu, 1,
+            {
+                text = _("Force Sync Now"),
+                enabled_func = function()
+                    if self.settings:getBaseUri() == "" then
+                        logger:info("BaseURI is not configured, cannot sync")
+                        return false
+                    end
+
+                    return true
+                end,
+                callback = function()
+                    UIManager:broadcastEvent(Event:new("GrimmorySync", true))
+                end,
+                separator = true,
+            }
+        )
+    else
+        table.insert(
+            menu, 1,
+            {
+                text = _("Interrupt Current Sync"),
+                callback = function()
+                    if self.interrupt_sync ~= nil then
+                        local dialog = ConfirmBox:new({
+                            text = _("Are you sure you want to interrupt synchronization?"),
+                            ok_callback = function()
+                                pcall(self.interrupt_sync)
+                            end,
+                        })
+                        UIManager:show(dialog)
+                    end
+                end,
+                separator = true,
+            }
+        )
+    end
+
+    return menu
 end
 
 function GrimmoryMenu:addToMainMenu(menu_items)
     menu_items.grimmory = {
         text = "Grimmory",
         sorting_hint = "tools",
-        sub_item_table = self:getTopMenu()
+        sub_item_table_func = function()
+            return self:getTopMenu()
+        end,
     }
 end
 
