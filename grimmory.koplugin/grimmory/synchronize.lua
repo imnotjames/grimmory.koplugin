@@ -229,7 +229,7 @@ function GrimmorySynchronize:synchronizeShelves(callback)
             shelf_name_to_id[unique_shelf_name:lower()] = shelf.id
 
             -- use tostring to get a sparse table
-            shelf_id_to_name[tostring(shelf.id)] = shelf_name
+            shelf_id_to_name[tostring(shelf.id)] = unique_shelf_name
         end
     end
 
