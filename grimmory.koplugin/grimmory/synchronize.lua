@@ -205,9 +205,10 @@ function GrimmorySynchronize:synchronizeShelves(callback)
     local shelf_id_to_name = {}
     local shelf_name_to_id = {}
 
+    -- Make sure we have our unique shelf names and ID mappings
     for _, shelf in ipairs(shelves) do
         if shelf.id and shelf.name and self:isTargetShelf(shelf.id) then
-            local shelf_name = shelf.name:lower()
+            local shelf_name = shelf.name
 
             logger:dbg("Shelf received from Grimmory", shelf.id, shelf_name)
 
@@ -216,7 +217,7 @@ function GrimmorySynchronize:synchronizeShelves(callback)
             -- until it's unique.
             local unique_shelf_name = shelf_name
             local unique_shelf_index = 0
-            while shelf_name_to_id[unique_shelf_name] do
+            while shelf_name_to_id[unique_shelf_name:lower()] do
                 unique_shelf_index = unique_shelf_index + 1
                 unique_shelf_name = shelf_name .. " (" .. unique_shelf_index .. ")"
             end
@@ -225,7 +226,7 @@ function GrimmorySynchronize:synchronizeShelves(callback)
                 logger:dbg("Duplicate shelf name found", shelf_name, "- used new name", unique_shelf_name)
             end
 
-            shelf_name_to_id[unique_shelf_name] = shelf.id
+            shelf_name_to_id[unique_shelf_name:lower()] = shelf.id
 
             -- use tostring to get a sparse table
             shelf_id_to_name[tostring(shelf.id)] = shelf_name
@@ -242,7 +243,7 @@ function GrimmorySynchronize:synchronizeShelves(callback)
 
                 -- This collection exists as a shelf so we should update it
                 -- if there's anything that needs to change.
-                if shelf_name ~= collection_name:lower() then
+                if shelf_name:lower() ~= collection_name:lower() then
                     -- This collection has been renamed!
                     logger:info("Renaming collection to match shelf name:", collection_name, ";", shelf_name)
 
@@ -293,7 +294,7 @@ function GrimmorySynchronize:synchronizeShelves(callback)
     end
 
     -- Make sure every shelf has a collection and create them if not
-    for shelf_name, shelf_id in pairs(shelf_name_to_id) do
+    for shelf_id, shelf_name in pairs(shelf_id_to_name) do
         if not ReadCollection.coll_settings[shelf_name] then
             logger:info("Adding a collection from a shelf", shelf_name, shelf_id)
 
