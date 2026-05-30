@@ -323,84 +323,11 @@ function GrimmoryLocalRepository:insertBookEvent(session_id, event_type, current
     end
 end
 
----@param look_back number | nil
----@return ReadingSessionProgress[] progress
-function GrimmoryLocalRepository:getReadingProgress(look_back)
-    local ok, results = self:withDatabase(
-        function(conn)
-            local stmt = conn:prepare([[
-                SELECT
-                    book.grimmory_id,
-                    book.book_path,
-                    book.partial_md5,
-
-                    book_event.created_at,
-                    book_event.current_page,
-                    book_event.page_count,
-                    book_event.xpointer
-                FROM (
-                    SELECT
-                        s.book_id,
-                        MAX(e.id) AS event_id
-                    FROM book_event e
-                    JOIN book_session s ON s.id = e.session_id
-                    WHERE e.created_at < ?
-                    GROUP BY s.book_id
-                ) AS last_event
-                JOIN book_event ON last_event.event_id = book_event.id
-                JOIN book_session ON book_event.session_id = book_session.id
-                JOIN book ON book_session.book_id = book.id;
-            ]])
-
-            local time_threshold = os.time() - (look_back or 0)
-
-            stmt:bind(time_threshold)
-
-            ---@type ReadingSessionProgress[]
-            local results = {}
-
-            for row in stmt:rows() do
-                local end_time = tonumber(row[4], 10) or 0
-                local end_page = tonumber(row[5]) or 0
-                local page_count = tonumber(row[6]) or 0
-
-                local end_progress = 0
-
-                if page_count > 0 then
-                    end_progress = (end_page / page_count) * 100
-                end
-
-                ---@type ReadingSessionProgress
-                local progress = {
-                    grimmory_id = tonumber(row[1]),
-                    book_path = row[2],
-                    book_md5 = row[3],
-                    end_time = end_time,
-                    end_page = end_page,
-                    end_progress = end_progress,
-                    end_xpointer = row[7],
-                }
-                table.insert(results, progress)
-            end
-
-            stmt:close()
-
-            return results
-        end
-    )
-
-    if not ok then
-        logger:err("Failed to get reading progress:", results)
-        return {}
-    end
-
-    return results
-end
-
----@param book_md5 string
----@param look_back number | nil
+---@param book_id number
+---@param cutoff number | nil
+---@return boolean ok
 ---@return ReadingSessionProgress | nil progress
-function GrimmoryLocalRepository:getReadingProgressForBook(book_md5, look_back)
+function GrimmoryLocalRepository:getReadingProgress(book_id, cutoff)
     local ok, result = self:withDatabase(
         function(conn)
             local stmt = conn:prepare([[
@@ -419,22 +346,24 @@ function GrimmoryLocalRepository:getReadingProgressForBook(book_md5, look_back)
                         MAX(e.id) AS event_id
                     FROM book_event e
                     JOIN book_session s ON s.id = e.session_id
-                    WHERE e.created_at < ?
+                    WHERE
+                        e.created_at < ?
                     GROUP BY s.book_id
                 ) AS last_event
                 JOIN book_event ON last_event.event_id = book_event.id
                 JOIN book_session ON book_event.session_id = book_session.id
                 JOIN book ON book_session.book_id = book.id
-                WHERE book.partial_md5 = ?
-                LIMIT 1;
+                WHERE
+                    book.id = ?
             ]])
 
-            local time_threshold = os.time() - (look_back or 0)
+            if cutoff == nil then
+                cutoff = os.time()
+            end
 
-            stmt:bind(time_threshold, book_md5)
+            stmt:bind(cutoff, book_id)
 
-            local row = stmt:rows()()
-
+            local row = stmt:step()
             stmt:close()
 
             if row == nil then
@@ -442,7 +371,6 @@ function GrimmoryLocalRepository:getReadingProgressForBook(book_md5, look_back)
             end
 
             local end_time = tonumber(row[4], 10) or 0
-
             local end_page = tonumber(row[5]) or 0
             local page_count = tonumber(row[6]) or 0
 
@@ -453,28 +381,28 @@ function GrimmoryLocalRepository:getReadingProgressForBook(book_md5, look_back)
             end
 
             return {
-                    grimmory_id = row[1],
-                    book_path = row[2],
-                    book_md5 = row[3],
-                    end_time = end_time,
-                    end_page = end_page,
-                    end_progress = end_progress,
-                    end_xpointer = row[7],
+                grimmory_id = tonumber(row[1]),
+                book_path = row[2],
+                book_md5 = row[3],
+                end_time = end_time,
+                end_page = end_page,
+                end_progress = end_progress,
+                end_xpointer = row[7],
             }
         end
     )
 
     if not ok then
-        logger:err("Failed to get reading progress:", result)
-        return nil
+        logger:err("Failed to get reading progress:", book_id, "-", result)
+        return ok, nil
     end
 
-    return result
+    return ok, result
 end
 
----@param since integer
+---@param book_id integer
 ---@return ReadingSessionEvent[]
-function GrimmoryLocalRepository:getEvents(since)
+function GrimmoryLocalRepository:getPendingSessionEvents(book_id)
     local ok, results = self:withDatabase(
         function(conn)
             local stmt = conn:prepare([[
@@ -490,13 +418,18 @@ function GrimmoryLocalRepository:getEvents(since)
                     e.page_count,
                     e.xpointer
                 FROM book AS b
+                LEFT JOIN book_sync_status AS bss
+                    ON bss.book_id = b.id AND bss.sync_type = "sessions"
                 JOIN book_session AS s ON s.book_id = b.id
                 JOIN book_event AS e ON e.session_id = s.id
-                WHERE e.created_at > ?
+                WHERE
+                    e.created_at > COALESCE(bss.last_synced_at, 0)
+                    AND
+                    b.id = ?
                 ORDER BY b.id ASC, e.created_at ASC
             ]])
 
-            stmt:bind(since)
+            stmt:bind(book_id)
 
             ---@type ReadingSessionEvent[]
             local results = {}
@@ -556,13 +489,13 @@ local function isPartOfSession(session, event)
     end
 end
 
----@param since integer
+---@param book_id integer
 ---@return ReadingSession[]
-function GrimmoryLocalRepository:getSessions(since)
+function GrimmoryLocalRepository:getPendingSessions(book_id)
     ---@type ReadingSession[]
     local sessions = {}
 
-    for _, event in ipairs(self:getEvents(since)) do
+    for _, event in ipairs(self:getPendingSessionEvents(book_id)) do
         -- Eventually we could figure out progress from start of page
         -- to end of page?  But for now the simplest is to count
         -- progress as a point-in-time.
@@ -626,6 +559,114 @@ function GrimmoryLocalRepository:getSessions(since)
     )
 
     return sessions
+end
+
+---@alias RepositorySyncType
+---| "progress"
+---| "sessions"
+
+---@param book_id number
+---@param sync_type RepositorySyncType
+---@param timestamp number
+function GrimmoryLocalRepository:updateBookSyncTimestamp(book_id, sync_type, timestamp)
+    local ok, message = self:withDatabase(
+        function(conn)
+            local stmt = conn:prepare([[
+                INSERT INTO book_sync_status
+                    (book_id, sync_type, last_synced_at)
+                VALUES (
+                    ?,
+                    ?,
+                    ?
+                )
+                ON CONFLICT (book_id, sync_type)
+                DO UPDATE SET
+                    last_synced_at = excluded.last_synced_at
+            ]])
+
+            stmt:bind(
+                book_id,
+                sync_type,
+                timestamp
+            )
+            stmt:step()
+            stmt:close()
+        end,
+        "rw"
+    )
+
+    if not ok then
+        logger:err("Failed to update book synced at:", book_id, "-", message)
+        return false
+    end
+
+    return true
+
+end
+
+---@param with_sessions boolean
+---@param with_progress boolean
+---@return number[] book_ids
+function GrimmoryLocalRepository:getBooksPendingSync(
+    with_sessions,
+    with_progress
+)
+    local ok, book_ids = self:withDatabase(
+        function(conn)
+            local stmt = conn:prepare([[
+                SELECT
+                    book.id
+                FROM book
+                JOIN book_session ON book.id = book_session.book_id
+                JOIN book_event ON book_session.id = book_event.session_id
+                LEFT JOIN book_sync_status AS sync_sessions
+                    ON book.id = sync_sessions.book_id AND sync_sessions.sync_type = "sessions"
+                LEFT JOIN book_sync_status AS sync_progress
+                    ON book.id = sync_progress.book_id AND sync_progress.sync_type = "progress"
+                WHERE
+                    grimmory_id IS NOT NULL
+                    AND
+                    (
+                        (
+                            ? = 1
+                            AND
+                            book_event.created_at > COALESCE(sync_sessions.last_synced_at, 0)
+                        )
+                        OR
+                        (
+                            ? = 1
+                            AND
+                            book_event.created_at > COALESCE(sync_progress.last_synced_at, 0)
+                        )
+                    )
+                GROUP BY book.id
+            ]])
+
+            stmt:bind(with_sessions and 1 or 0, with_progress and 1 or 0)
+
+            ---@type number[]
+            local results = {}
+
+            for row in stmt:rows() do
+                local book_id = tonumber(row[1])
+
+                if book_id then
+                    table.insert(results, book_id)
+                end
+            end
+
+            stmt:close()
+
+            return results
+        end
+    )
+
+    if not ok or not book_ids then
+        logger:err("Failed to get books for sync", book_ids)
+        return {}
+    end
+
+    return book_ids
 end
 
 return GrimmoryLocalRepository

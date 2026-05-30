@@ -358,11 +358,6 @@ function Grimmory:onGrimmorySync(verbose)
                     pcall(update_callback, indeterminate_progress, 20)
                 end
 
-                if progress.since then
-                    -- Update since
-                    self.settings:setSynchronizedUntil(progress.since)
-                end
-
                 if progress.state == "session-recorded" then
                     session_count = session_count + 1
                 elseif progress.state == "session-error" then

@@ -65,33 +65,67 @@ function GrimmorySynchronize:refreshBooksFromAPI()
     end
 end
 
-function GrimmorySynchronize:synchronizeSessions(callback)
-    if not self.settings:getSyncReadingSessions() then
-        logger:info("Reading sessions sync skipped because feature is disabled")
+---@param book_id integer
+---@param callback function
+function GrimmorySynchronize:pushBookProgress(book_id, callback)
+    if not self.settings:getSyncReadingProgress() then
+        logger:info("Reading progress skipped because feature is disabled for:", book_id)
         return
     end
 
-    local since = self.settings:getSynchronizedUntil()
-    logger:info("Synchronizing sessions since", since)
+    local progress_ok, progress = self.repository:getReadingProgress(book_id)
 
-    local sessions = self.repository:getSessions(since)
+    if progress_ok and progress ~= nil then
+        logger:info("Synchronizing reading progress for:", book_id)
+        local ok = self.reading_progress_manager:pushRemoteProgress(progress)
+
+        if ok then
+            callback({
+                state = "progress-pushed",
+                book_path = progress.book_path,
+                book_md5 = progress.book_md5,
+            })
+
+            self.repository:updateBookSyncTimestamp(book_id, "progress", progress.end_time)
+        else
+            callback({
+                state = "progress-failed",
+                book_path = progress.book_path,
+                book_md5 = progress.book_md5,
+            })
+        end
+    end
+end
+
+---@param book_id integer
+---@param callback function
+function GrimmorySynchronize:pushBookSessions(book_id, callback)
+    if not self.settings:getSyncReadingSessions() then
+        -- Since the reading session sync is disabled, skip them.
+        logger:dbg("Reading sessions skipped because feature is disabled for:", book_id)
+        return
+    end
 
     local threshold_pages = self.settings:getSessionThresholdPages()
     local threshold_seconds = self.settings:getSessionThresholdSeconds()
+
+    logger:info("Synchronizing reading sessions for:", book_id)
+
+    local sessions = self.repository:getPendingSessions(book_id)
 
     for _, session in ipairs(sessions) do
         local total_seconds = session.end_time - session.start_time
         local total_pages = session.end_page - session.start_page + 1
 
         if total_seconds < threshold_seconds then
-            logger:info("Skipped session below time threshold for book", session.book_path)
+            logger:info("Skipped session below time threshold for book", book_id)
             callback({
                 state = "session-skip",
                 bookPath = session.book_path,
                 since = session.end_time,
             })
         elseif total_pages < threshold_pages then
-            logger:info("Skipped session below page threshold for book", session.book_path)
+            logger:info("Skipped session below page threshold for book", book_id)
             callback({
                 state = "session-skip",
                 bookPath = session.book_path,
@@ -110,31 +144,25 @@ function GrimmorySynchronize:synchronizeSessions(callback)
                 session.end_xpointer
             )
 
-            local ok = false
-            local body
-            if session.grimmory_id == nil then
-                body = "Could not match local book to Grimmory"
-            else
-                ok, body = self.api:recordSession(
-                    session.grimmory_id,
-                    session.start_time,
-                    session.end_time,
-                    session.start_progress,
-                    session.end_progress,
-                    session.start_xpointer,
-                    session.end_xpointer
-                )
-            end
+            local ok, body = self.api:recordSession(
+                session.grimmory_id,
+                session.start_time,
+                session.end_time,
+                session.start_progress,
+                session.end_progress,
+                session.start_xpointer,
+                session.end_xpointer
+            )
 
             if ok then
-                logger:info("Session recorded successfully for book", session.book_path)
+                logger:info("Session recorded successfully for book:", book_id)
                 callback({
                     state = "session-recorded",
                     bookPath = session.book_path,
                     since = session.end_time,
                 })
             else
-                logger:err("Session failed recording with error for book: ", session.book_path, " - ", body)
+                logger:err("Session failed recording with error for book: ", book_id, " - ", body)
                 callback({
                     state = "session-error",
                     bookPath = session.book_path,
@@ -142,6 +170,30 @@ function GrimmorySynchronize:synchronizeSessions(callback)
                 })
             end
         end
+
+        self.repository:updateBookSyncTimestamp(book_id, "sessions", session.end_time)
+    end
+end
+
+---@param book_id integer
+---@param callback function
+function GrimmorySynchronize:pushBookMetadata(book_id, callback)
+    self:pushBookProgress(book_id, callback)
+    self:pushBookSessions(book_id, callback)
+end
+
+function GrimmorySynchronize:pushAllPendingBookMetadata(callback)
+    local book_ids = self.repository:getBooksPendingSync(
+        self.settings:getSyncReadingSessions(),
+        self.settings:getSyncReadingProgress()
+    )
+
+    for _, book_id in ipairs(book_ids) do
+        if book_id == nil then
+            break
+        end
+
+        self:pushBookMetadata(book_id, callback)
     end
 end
 
@@ -403,7 +455,7 @@ function GrimmorySynchronize:associateWithShelves(book_path, shelves)
     ReadCollection:write()
 end
 
-function GrimmorySynchronize:synchronizeBooks(callback)
+function GrimmorySynchronize:pullBooks(callback)
     if not self.settings:getSyncShelves() then
         logger:info("Book download skipped because feature is disabled")
         return
@@ -480,29 +532,6 @@ function GrimmorySynchronize:synchronizeBooks(callback)
     end
 end
 
-function GrimmorySynchronize:synchronizeProgress(callback)
-    local reading_progress_records = self.repository:getReadingProgress()
-
-    -- From Koreader to grimmory
-    for _, progress in ipairs(reading_progress_records) do
-        local ok = self.reading_progress_manager:pushRemoteProgress(progress)
-
-        if ok then
-            callback({
-                state = "progress-pushed",
-                book_path = progress.book_path,
-                book_md5 = progress.book_md5,
-            })
-        else
-            callback({
-                state = "progress-failed",
-                book_path = progress.book_path,
-                book_md5 = progress.book_md5,
-            })
-        end
-    end
-end
-
 ---@return boolean ok
 function GrimmorySynchronize:checkForHealthyServer()
     local ok, version = self.api:getServerVersion()
@@ -521,19 +550,21 @@ function GrimmorySynchronize:synchronizeAll(callback)
     end
 
     -- Refresh so we pull fresh books
+    logger:info("Reading books from API")
     self:refreshBooksFromAPI()
 
-    self:synchronizeProgress(callback)
+    -- First, tell Grimmory about all of our reading
+    logger:info("Pushing pending book metadata")
+    self:pushAllPendingBookMetadata(callback)
 
+    -- Then pull the shelves
+    logger:info("Synchronizing shelves")
     self:synchronizeShelves(callback)
 
-    self:synchronizeSessions(callback)
-
-    self:synchronizeBooks(callback)
-
-    logger:info("Highlights not implemented yet")
-
-    logger:info("Personal ratings not implemented yet")
+    -- And only afterwards, pull new books because our
+    -- reading progress may change the books we sync down
+    logger:info("Pulling books")
+    self:pullBooks(callback)
 
     logger:info("Done synchronizing")
 end

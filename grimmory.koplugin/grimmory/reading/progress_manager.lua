@@ -59,9 +59,9 @@ end
 
 ---@return ReadingSessionProgress | nil progress
 function ReadingProgressManager:getLocalProgressForBook(book_path)
-    local partial_md5 = util.partialMD5(book_path)
+    local ok, book_id = self.repository:upsertBook(book_path)
 
-    if partial_md5 == nil then
+    if not ok or book_id == nil then
         return nil
     end
 
@@ -69,9 +69,13 @@ function ReadingProgressManager:getLocalProgressForBook(book_path)
         -- This is a bit of a hack to handle the fact that the page event
         -- is fired before the reader is ready.
         -- Look back 30 seconds so the "current" session isn't counted
-        return self.repository:getReadingProgressForBook(partial_md5, 30)
+        local _, progress = self.repository:getReadingProgress(book_id, os.time() - 30)
+
+        return progress
     else
-        return self.repository:getReadingProgressForBook(partial_md5)
+        local _, progress = self.repository:getReadingProgress(book_id)
+
+        return progress
     end
 end
 

@@ -34,14 +34,12 @@ local logger = GrimmoryLogger:new()
 ---@field sync_download_directory string
 ---@field sync_reading_sessions boolean
 ---@field sync_reading_progress boolean
----@field synchronized_until number
 ---@field device_id string
 ---@field device_name string
 
 ---@type GrimmorySettingsData
 local DEFAULTS = {
     automatic_check_updates = false,
-    synchronized_until = os.time(), -- plugin init time
     base_uri = "",
     username = "",
     password = "",
@@ -316,16 +314,6 @@ end
 
 function GrimmorySettings:toggleSyncEnableWifi()
     self.data.sync_enable_wifi = not self:getSyncEnableWifi()
-    self:write()
-end
-
-function GrimmorySettings:getSynchronizedUntil()
-    return self.data.synchronized_until or DEFAULTS.synchronized_until
-end
-
----@param timestamp number
-function GrimmorySettings:setSynchronizedUntil(timestamp)
-    self.data.synchronized_until = timestamp
     self:write()
 end
 
