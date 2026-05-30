@@ -367,6 +367,18 @@ function GrimmorySynchronize:synchronizeShelves(callback)
     ReadCollection:write()
 end
 
+function GrimmorySynchronize:pullBookProgress(book_path)
+    if not self.settings:getSyncReadingProgress() then
+        return
+    end
+
+    local _, _, progress = self.reading_progress_manager:getRemoteProgressForBook(book_path)
+
+    if progress then
+        self.reading_progress_manager:applyProgress(progress)
+    end
+end
+
 function GrimmorySynchronize:downloadBook(book_id, download_path)
     local success, result, message = pcall(function()
         return self.api:downloadBook(book_id, download_path)
@@ -380,6 +392,8 @@ function GrimmorySynchronize:downloadBook(book_id, download_path)
     if not result then
         return false, message
     end
+
+    self:pullBookProgress(download_path)
 
     return true, nil
 end

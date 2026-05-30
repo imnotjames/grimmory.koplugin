@@ -65,7 +65,7 @@ function ReadingProgressManager:getLocalProgressForBook(book_path)
         return nil
     end
 
-    if book_path == self.ui.document.file then
+    if self.ui.document and book_path == self.ui.document.file then
         -- This is a bit of a hack to handle the fact that the page event
         -- is fired before the reader is ready.
         -- Look back 30 seconds so the "current" session isn't counted
@@ -173,11 +173,22 @@ function ReadingProgressManager:getRemoteProgressForBook(book_path)
         partial_md5
     )
 
-    if not ok or not progress or type(progress) == "string" then
+    if not ok or type(progress) == "string" then
         self.koreader_auth_id = nil
         self.koreader_auth_secret_md5 = nil
 
         logger:err("Failed to get progress")
+        return nil, nil, nil
+    end
+
+    if progress == nil then
+        -- There's just no progress
+        return nil, nil, nil
+    end
+
+    if type(progress.percentage) ~= "number" then
+        -- This is sometimes a `json.util.null` - perhaps if the record
+        -- exists but has been reset?  The value is `null` in the JSON
         return nil, nil, nil
     end
 
@@ -208,7 +219,7 @@ end
 function ReadingProgressManager:applyProgress(progress)
     -- If book path is the currently open book, use the go to command
     -- DocMetadata -> "last_xpointer" to progress
-    if progress.book_path == self.ui.document.file then
+    if self.ui.document and progress.book_path == self.ui.document.file then
         if self.ui.document.info.has_pages then
             if progress.end_page then
                 self.ui:handleEvent(Event:new("GotoPage", tonumber(progress.end_page)))

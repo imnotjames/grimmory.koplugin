@@ -574,12 +574,17 @@ function GrimmoryAPI:getReadingProgress(username, auth_key, book_md5)
         ["x-auth-key"] = auth_key,
     }
 
-    local ok, _, body = self:request(
+    local ok, code, body = self:request(
         "GET",
         "/api/koreader/syncs/progress/" .. book_md5,
         nil,
         headers
     )
+
+    if code == 404 then
+        -- With a 404 we can just say there's no progress
+        return true, nil
+    end
 
     if not ok or not body or type(body) == "string" then
         logger:err("Unable to read progress for book:", book_md5, "-", body)
