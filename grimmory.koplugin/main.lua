@@ -308,29 +308,25 @@ function Grimmory:onGrimmorySync(verbose)
             return
         end
 
-        local should_terminate = false
-
         if not self:isReadyToSync() then
             return
         end
 
         logger:info("Synchronizing to Grimmory")
 
+        local should_terminate = false
+        local terminated_early = true
+        local queue_terminate = function() should_terminate = true end
+
         self.is_synchronizing = true
-        self.menu:onGrimmorySyncStart(function()
-            self.is_synchronizing = false
-            should_terminate = true
-        end)
+        self.menu:onGrimmorySyncStart(queue_terminate)
 
         local update_callback, close_callback
         if verbose then
             update_callback, close_callback = self.dialog_manager:showProgressDialog(
                 _("Synchronizing to Grimmory"),
-                function()
-                    self.is_synchronizing = false
-                    should_terminate = true
-                end,
-                _("Are you sure you want to interrupt synchronization?")
+                queue_terminate,
+                _("Continue synchronization?")
             )
         end
 
@@ -349,6 +345,7 @@ function Grimmory:onGrimmorySync(verbose)
             end,
             function(progress, terminate)
                 if should_terminate then
+                    terminated_early = true
                     terminate()
                 end
 
@@ -393,7 +390,7 @@ function Grimmory:onGrimmorySync(verbose)
         end
 
         if not ok then
-            if should_terminate then
+            if terminated_early then
                 logger:info("Sync was interrupted by user")
 
                 if verbose then

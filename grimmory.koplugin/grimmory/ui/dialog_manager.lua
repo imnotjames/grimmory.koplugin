@@ -380,42 +380,30 @@ end
 
 function DialogManager:showProgressDialog(title, dismiss_callback, dismiss_text)
     local dialog
-    local confirm_dialog
     local is_closing = false
 
     if dismiss_text == nil then
         dismiss_text = _("Terminate this task?")
     end
 
-    local confirm_dismiss = function()
+    local close_callback = function()
+        -- Track this because `dialog:close()` will call this function
         if is_closing then
-            -- The dismiss callback is fired even when
-            -- an outside force is trying to close the
-            -- dialog.
             return
         end
 
-        if confirm_dialog then
-            UIManager:close(confirm_dialog)
-        end
-
-        confirm_dialog = ConfirmBox:new({
-            text = dismiss_text,
-            ok_callback = function()
-                pcall(dismiss_callback)
-                dialog:close()
-            end,
-        })
-
-        UIManager:show(confirm_dialog)
+        is_closing = true
+        pcall(dismiss_callback)
+        dialog:close()
     end
 
     dialog = ProgressbarDialog:new({
         title = _(title),
         progress_max = 100,
         refresh_time_seconds = 3,
+        dismiss_text = dismiss_text,
         dismissable = dismiss_callback ~= nil,
-        dismiss_callback = confirm_dismiss,
+        dismiss_callback = close_callback,
     })
 
     dialog:show()
@@ -423,16 +411,6 @@ function DialogManager:showProgressDialog(title, dismiss_callback, dismiss_text)
     local function update_callback(progress, total_progress)
         dialog.progress_max = total_progress
         dialog:reportProgress(progress)
-    end
-
-    local function close_callback()
-        is_closing = true
-
-        if confirm_dialog then
-            UIManager:close(confirm_dialog)
-        end
-
-        dialog:close()
     end
 
     return update_callback, close_callback
