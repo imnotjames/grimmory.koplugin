@@ -395,6 +395,9 @@ function GrimmorySynchronize:associateWithShelves(book_path, shelves)
             ReadCollection:addItem(book_path, collection_name)
         end
     end
+
+    -- Persist book to the database
+    ReadCollection:write()
 end
 
 function GrimmorySynchronize:synchronizeBooks(callback)
