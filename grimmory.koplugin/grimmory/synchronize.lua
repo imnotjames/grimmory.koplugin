@@ -161,6 +161,8 @@ function GrimmorySynchronize:pushBookSessions(book_id, callback)
                     bookPath = session.book_path,
                     since = session.end_time,
                 })
+
+                self.repository:updateBookSyncTimestamp(book_id, "sessions", session.end_time)
             else
                 logger:err("Session failed recording with error for book: ", book_id, " - ", body)
                 callback({
@@ -168,10 +170,12 @@ function GrimmorySynchronize:pushBookSessions(book_id, callback)
                     bookPath = session.book_path,
                     since = session.end_time,
                 })
+
+                -- If an error happens for this session we bail early so
+                -- retries can happen again later
+                break
             end
         end
-
-        self.repository:updateBookSyncTimestamp(book_id, "sessions", session.end_time)
     end
 end
 
