@@ -1,9 +1,12 @@
 # grimmory.koplugin
 
 > [!WARNING]
-> This is beta software and may have bugs or other inadvertent behaviors.
+> This is ALPHA software and WILL have bugs or other inadvertent behaviors.
 > 
-> Beware, that makes you a beta tester.  Please report any bugs or issues.
+> Beware, that makes you an ALPHA tester.  This software may require you to
+> erase data on your device, or on your Grimmory server.
+>
+> Please report any bugs or issues.
 
 Read your books from Grimmory, sync your shelves, and track reading
 progress automatically.
