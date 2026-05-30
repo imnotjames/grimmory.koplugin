@@ -119,6 +119,14 @@ end
 function DocMetadata:setProgress(path, percent, xpointer, page)
     local settings = self:getDocSettings(path)
 
+    -- Hack to prevent us from getting a weird message from koreader
+    -- There may be another way but this seems to be the simplest
+    -- and we only set it if it's not already set.
+    settings:readSetting(
+        "cre_dom_version",
+        settings:readSetting("cre_dom_version", 20200223)
+    )
+
     if percent ~= nil then
         settings:saveSetting("percent_finished", percent)
     else
