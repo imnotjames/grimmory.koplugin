@@ -299,6 +299,9 @@ function Grimmory:onGrimmorySyncBackground()
 end
 
 function Grimmory:onGrimmorySync(verbose)
+    -- Tell everything to flush so we have data available for our sync
+    UIManager:broadcastEvent(Event:new("FlushSettings"))
+
     local function sync_callback()
         if not self.wifi_manager:isConnected() then
             logger:err("Cannot sync without connectivity")
