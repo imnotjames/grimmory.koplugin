@@ -19,6 +19,15 @@ local function compareProgress(progress_a, progress_b)
         return 1
     end
 
+    -- If the two progress values are very close to each other just say they're
+    -- the same.
+    if progress_b.end_xpointer ~= nil and progress_b.end_xpointer == progress_a.end_xpointer then
+        return 0
+    elseif math.abs(progress_b.end_progress - progress_a.end_progress) < 0.01 then
+        return 0
+    end
+
+    -- Otherwise, suggest if newer.
     if progress_a.end_time == progress_b.end_time then
         return 0
     elseif progress_a.end_time < progress_b.end_time then

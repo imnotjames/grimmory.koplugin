@@ -393,7 +393,11 @@ function GrimmorySynchronize:downloadBook(book_id, download_path)
         return false, message
     end
 
-    self:pullBookProgress(download_path)
+    local progress_ok, progress_result = pcall(self.pullBookProgress, self, download_path)
+
+    if not progress_ok then
+        logger:warn("Could not pull progress for book:", book_id, "-", progress_result)
+    end
 
     return true, nil
 end

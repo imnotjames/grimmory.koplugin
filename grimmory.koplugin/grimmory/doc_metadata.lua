@@ -128,7 +128,7 @@ function DocMetadata:setProgress(path, percent, xpointer, page)
     )
 
     if percent ~= nil then
-        settings:saveSetting("percent_finished", percent)
+        settings:saveSetting("percent_finished", percent / 100)
     else
         settings:delSetting("percent_finished")
     end
@@ -146,20 +146,6 @@ function DocMetadata:setProgress(path, percent, xpointer, page)
     end
 
     settings:flush()
-end
-
----@param path string
----@return number | nil percent
----@return string | nil xpointer
----@return number | nil page
-function DocMetadata:getProgress(path)
-    local settings = self:getDocSettings(path)
-
-    local percent = settings:readSetting("percent_finished")
-    local xpointer = settings:readSetting("last_xpointer")
-    local page = settings:readSetting("last_page")
-
-    return percent, xpointer, page
 end
 
 return DocMetadata
