@@ -362,6 +362,7 @@ function GrimmorySynchronize:downloadBook(book_id, download_path)
 end
 
 ---@param book Book
+---@return string | nil download_path
 function GrimmorySynchronize:getBookDownloadPath(book)
     local existing_book_ok, existing_book_path = self.repository:getBookInfo(book.id)
     if existing_book_ok and existing_book_path then
@@ -371,7 +372,7 @@ function GrimmorySynchronize:getBookDownloadPath(book)
     local download_directory = self.settings:getSyncDownloadDirectory()
 
     if not download_directory or download_directory == "" then
-        return nil
+        error("Download directory is invalid")
     end
 
     local download_path = download_directory .. "/" .. util.getSafeFilename(book.primary_file.filename)
@@ -387,7 +388,7 @@ function GrimmorySynchronize:getBookDownloadPath(book)
         return download_path
     end
 
-    -- At this point we need a fallback name.  `download-${BOOK_ID}.${EXT}` is not
+    -- At this point we need a fallback name.  `downloaded-${BOOK_ID}.${EXT}` is not
     -- great but I don't know a better safe way off hand.
 
     local file_extension = util.getFileNameSuffix(book.primary_file.filename)
@@ -410,8 +411,8 @@ function GrimmorySynchronize:getBookDownloadPath(book)
     end
 
     -- Give up.
-    logger:err("Could not determine a valid download path for book:", book.id)
-    return nil
+    logger:warn("Could not verify book, but proceeding anyway with path:", book.id, "at", download_path)
+    return download_path
 end
 
 function GrimmorySynchronize:associateWithShelves(book_path, shelves)
