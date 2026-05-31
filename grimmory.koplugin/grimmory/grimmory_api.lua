@@ -374,6 +374,30 @@ function GrimmoryAPI:getBooks()
     return ok, books
 end
 
+---@return boolean ok
+---@return Book[] | string
+function GrimmoryAPI:getBooksPage(page_number)
+    local ok, _, body = self:request(
+        "GET",
+        "/api/v1/books/page?sort=addedOn,asc&page=" .. tostring(page_number or 0)
+    )
+
+    if not ok or type(body) == "string" then
+        logger:err("Could not get books", body)
+        return ok, body
+    end
+
+    local books = {}
+
+    if type(body.content) == "table" then
+        for _, raw_book in ipairs(body.content) do
+            table.insert(books, parseBook(raw_book))
+        end
+    end
+
+    return ok, books
+end
+
 function GrimmoryAPI:downloadBook(book_id, destination_path)
     local path = "/api/v1/books/" .. tonumber(book_id) .. "/download"
 

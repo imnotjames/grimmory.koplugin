@@ -24,24 +24,6 @@ function GrimmorySynchronize:new(o)
     return o
 end
 
-function GrimmorySynchronize:refreshBooksFromAPI()
-    local ok, books = self.api:getBooks()
-
-    if not ok or type(books) == "string" then
-        logger:err("Something went wrong fetching books", books)
-        return {}
-    end
-
-    ---@type Book[]
-    self.cached_books = {}
-
-    for _, book in ipairs(books) do
-        if self:isTargetBook(book) then
-            table.insert(self.cached_books, book)
-        end
-    end
-end
-
 ---@param book_id integer
 ---@param callback function
 function GrimmorySynchronize:pushBookProgress(book_id, callback)
@@ -454,6 +436,70 @@ function GrimmorySynchronize:associateWithShelves(book_path, shelves)
     ReadCollection:write()
 end
 
+
+---@param book Book
+---@param callback function
+function GrimmorySynchronize:pullBook(book, callback)
+    local book_exists = false
+
+    if book.primary_file == nil then
+        logger:dbg("Skipping book without file:", book.id)
+        callback({
+            state = "book-skipped",
+            book_id = book.id,
+            download_path = nil,
+        })
+        return
+    end
+
+    local download_path = self:getBookDownloadPath(book)
+
+    -- TODO: Search through known books from collections for this book
+    --       If found, set the `download path to that value.
+
+    if download_path ~= nil and util.fileExists(download_path) then
+        book_exists = true
+    end
+
+    if not book_exists then
+        if download_path ~= nil then
+            logger:dbg("Downloading book", book.id, "to", download_path)
+
+            local ok, message = self:downloadBook(book.id, download_path)
+            if ok then
+                logger:info("Book downloaded:", book.id, " - ", download_path)
+                callback({
+                    state = "book-downloaded",
+                    book_id = book.id,
+                    download_path = download_path,
+                })
+                book_exists = true
+            else
+                logger:err("Book failed download:", book.id, "-", message)
+                callback({
+                    state = "book-error",
+                    book_id = book.id,
+                    download_path = download_path,
+                })
+            end
+        else
+            logger:err("Book skipped as download path could not be found")
+            callback({
+                state = "book-skipped",
+                book_id = book.id,
+                download_path = download_path,
+            })
+        end
+    end
+
+    if book_exists and download_path then
+        -- After we're done, if the book exists we should attach it
+        -- to associated shelves.
+        self:associateWithShelves(download_path, book.shelves)
+        self.repository:upsertBook(download_path, book.id)
+    end
+end
+
 function GrimmorySynchronize:pullBooks(callback)
     if not self.settings:getSyncShelves() then
         logger:info("Book download skipped because feature is disabled")
@@ -473,61 +519,29 @@ function GrimmorySynchronize:pullBooks(callback)
         return
     end
 
-    -- Eventually we should support a "since" but for right
-    -- now it's easiest to sync everything.
-    local books = self.cached_books or {}
+    local page = 0
 
-    -- TODO: Read known books from shelves in case we move the download directory
+    while true do
+        logger:dbg("Fetching books to pull, page:", page)
 
-    for _, book in ipairs(books) do
-        local book_exists = false
+        local books_ok, books_batch = self.api:getBooksPage(page)
 
-        local download_path = self:getBookDownloadPath(book)
-
-        -- TODO: Search through known books from shelves for this book
-        --       If found, set the `download path to that value.
-
-        if download_path ~= nil and util.fileExists(download_path) then
-            book_exists = true
-        end
-
-        if not book_exists then
-            if download_path ~= nil then
-                logger:dbg("Downloading book", book.id, "to", download_path)
-
-                local ok, message = self:downloadBook(book.id, download_path)
-                if ok then
-                    logger:info("Book downloaded:", book.id, " - ", download_path)
-                    callback({
-                        state = "book-downloaded",
-                        book_id = book.id,
-                        download_path = download_path,
-                    })
-                    book_exists = true
-                else
-                    logger:err("Book failed download:", book.id, "-", message)
-                    callback({
-                        state = "book-error",
-                        book_id = book.id,
-                        download_path = download_path,
-                    })
-                end
-            else
-                logger:err("Book skipped as download path could not be found")
-                callback({
-                    state = "book-skipped",
-                    book_id = book.id,
-                    download_path = download_path,
-                })
+        if books_ok and type(books_batch) == "table" then
+            if #books_batch == 0 then
+                break
             end
+
+            for _, book in ipairs(books_batch) do
+                if self:isTargetBook(book) then
+                    self:pullBook(book, callback)
+                end
+            end
+        else
+            logger:info("Something went wrong pulling books, stopping book sync")
+            break
         end
 
-        if book_exists and download_path then
-            -- After we're done, if the book exists we should attach it
-            -- to associated shelves.
-            self:associateWithShelves(download_path, book.shelves)
-            self.repository:upsertBook(download_path, book.id)
-        end
+        page = page + 1
     end
 end
 
@@ -555,10 +569,6 @@ function GrimmorySynchronize:synchronizeAll(callback)
     -- Then pull the shelves
     logger:info("Synchronizing shelves")
     self:synchronizeShelves(callback)
-
-    -- Refresh so we pull fresh books
-    logger:info("Reading books from API")
-    self:refreshBooksFromAPI()
 
     -- And only afterwards, pull new books because our
     -- reading progress may change the books we sync down
