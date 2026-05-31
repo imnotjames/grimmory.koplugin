@@ -369,17 +369,18 @@ function Grimmory:onGrimmorySync(verbose)
                     local pushed_books = progress.pushed_books or 0
                     local total_books = progress.total_books or 0
 
-
                     if total_books == 0 then
                         pushed_books = 1
                         total_books = 1
                     end
 
+                    -- Pushing sessions is 1, 2, and 3
                     update_progress_step(math.floor((pushed_books / total_books) * 3))
                 end
 
                 if progress.state:find("^shelf-") ~= nil then
                     -- If we are still seeing shelves we are at step 3
+                    -- Because complete with shelves is step 4.
                     update_progress_step(3)
                 end
 
@@ -392,6 +393,7 @@ function Grimmory:onGrimmorySync(verbose)
                         total_books = 1
                     end
 
+                    -- Step 5, 6, 7, 8, 9 are all pulling books down
                     update_progress_step(4 + math.floor((viewed_books / total_books) * 5))
                 end
 
