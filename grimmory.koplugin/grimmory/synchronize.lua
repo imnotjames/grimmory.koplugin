@@ -433,6 +433,7 @@ function GrimmorySynchronize:getBookDownloadPath(book)
 end
 
 function GrimmorySynchronize:associateWithShelves(book_path, shelves)
+    local local_shelves = {}
     local shelf_id_to_name = {}
     for collection_name, _ in pairs(ReadCollection.coll) do
         local shelf_id = ReadCollection.coll_settings[collection_name].connectorId
@@ -440,18 +441,30 @@ function GrimmorySynchronize:associateWithShelves(book_path, shelves)
         if shelf_id then
             shelf_id_to_name[tostring(shelf_id)] = collection_name
         end
+
+        if ReadCollection.coll[collection_name][book_path] ~= nil then
+            local_shelves[collection_name] = true
+        end
     end
 
+    local remote_shelves = {}
     for _, shelf_id in ipairs(shelves) do
         local collection_name = shelf_id_to_name[tostring(shelf_id)]
+        remote_shelves[collection_name] = true
 
-        if collection_name then
+        if collection_name and not local_shelves[collection_name] then
+            logger:dbg("Adding book to collection:", book_path, collection_name)
             ReadCollection:addItem(book_path, collection_name)
         end
     end
 
-    -- Persist book to the database
-    ReadCollection:write()
+    -- Remove any current collections that are not current shelves.
+    for collection_name, _ in pairs(local_shelves) do
+        if not remote_shelves[collection_name] then
+            logger:dbg("Removing book from collection:", book_path, collection_name)
+            ReadCollection:removeItem(book_path, collection_name)
+        end
+    end
 end
 
 function GrimmorySynchronize:pullBooks(callback)
@@ -529,6 +542,10 @@ function GrimmorySynchronize:pullBooks(callback)
             self.repository:upsertBook(download_path, book.id)
         end
     end
+
+    -- During pulling books we may have updated the collections that
+    -- books are in which need to be persisted to disk
+    ReadCollection:write()
 end
 
 ---@return boolean ok
