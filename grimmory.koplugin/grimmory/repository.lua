@@ -240,9 +240,14 @@ function GrimmoryLocalRepository:getBookInfo(grimmory_id)
         end
     )
 
-    if not ok or not book then
+    if not ok then
         logger:err("Failed to find book:", grimmory_id, "-", book)
         return false, nil, nil
+    end
+
+    if not book then
+        logger:dbg("Book query succees but did not find book:", grimmory_id)
+        return true, nil, nil
     end
 
     return true, book.book_path, book.book_md5
