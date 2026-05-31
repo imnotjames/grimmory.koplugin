@@ -10,7 +10,7 @@ local logger = GrimmoryLogger:new()
 ---@field reading_progress_manager ReadingProgressManager
 ---@field settings GrimmorySettings
 ---@field api GrimmoryAPI
----@field book_resolver GrimmoryBookResolver
+---@field doc_metadata GrimmoryDocMetadata
 ---@field cached_books Book[]
 local GrimmorySynchronize = {
     synchronize_sessions_since = 0,
@@ -24,36 +24,13 @@ function GrimmorySynchronize:new(o)
     return o
 end
 
-function GrimmorySynchronize:getTitleIdentifier(title, author)
-    if title == nil then
-        return nil
-    end
-
-    if author == nil then
-        author = "NA"
-    end
-
-    local title_identifier = title:lower():gsub("[^a-z0-9]+", "") .. "--" .. author:lower():gsub("[^a-z0-9]+", "")
-
-    if string.len(title_identifier) < 5 then
-        return nil
-    end
-
-    return title_identifier
-end
-
 function GrimmorySynchronize:refreshBooksFromAPI()
-    ---@type table<string, number>
-    self.identifiers_to_book_id = {}
-
     local ok, books = self.api:getBooks()
 
     if not ok or type(books) == "string" then
         logger:err("Something went wrong fetching books", books)
         return {}
     end
-
-    self.book_resolver:refreshBooks(books)
 
     ---@type Book[]
     self.cached_books = {}
@@ -423,7 +400,7 @@ function GrimmorySynchronize:getBookDownloadPath(book)
     end
 
     -- If the path exists we have to check to make sure that it is actually the book we care about
-    if self.book_resolver:getBookId(download_path) == book.id then
+    if self.doc_metadata:isBook(download_path, book) then
         -- We have a match, this path is safe.
         return download_path
     end
@@ -445,7 +422,7 @@ function GrimmorySynchronize:getBookDownloadPath(book)
     end
 
     -- Okay, this file exists.  It's GOT to be our file, though, right?
-    if self.book_resolver:getBookId(download_path) == book.id then
+    if self.doc_metadata:isBook(download_path, book) then
         -- We have a match, this path is safe.
         return download_path
     end
@@ -571,10 +548,6 @@ function GrimmorySynchronize:synchronizeAll(callback)
         return error("Cannot connect to valid server")
     end
 
-    -- Refresh so we pull fresh books
-    logger:info("Reading books from API")
-    self:refreshBooksFromAPI()
-
     -- First, tell Grimmory about all of our reading
     logger:info("Pushing pending book metadata")
     self:pushAllPendingBookMetadata(callback)
@@ -582,6 +555,10 @@ function GrimmorySynchronize:synchronizeAll(callback)
     -- Then pull the shelves
     logger:info("Synchronizing shelves")
     self:synchronizeShelves(callback)
+
+    -- Refresh so we pull fresh books
+    logger:info("Reading books from API")
+    self:refreshBooksFromAPI()
 
     -- And only afterwards, pull new books because our
     -- reading progress may change the books we sync down

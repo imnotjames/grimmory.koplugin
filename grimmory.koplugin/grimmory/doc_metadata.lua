@@ -1,5 +1,6 @@
 local DocSettings = require("docsettings")
 
+---@class GrimmoryDocMetadata
 local DocMetadata = {}
 
 function DocMetadata:new(o)
@@ -105,6 +106,27 @@ end
 
 function DocMetadata:getAuthor(path)
     return self:getDocProps(path).authors
+end
+
+---@param path string
+---@param book Book
+function DocMetadata:isBook(path, book)
+    local isbn = self:getISBN(path)
+    local asin = self:getASIN(path)
+
+    if isbn and isbn == book.metadata.isbn10 then
+        return true
+    end
+
+    if isbn and isbn == book.metadata.isbn13 then
+        return true
+    end
+
+    if asin and asin == book.metadata.asin then
+        return true
+    end
+
+    return false
 end
 
 ---@param path string
