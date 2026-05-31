@@ -193,7 +193,7 @@ function GrimmoryExecutor:run(runnable, on_progress)
 
                 messages_received = messages_received + 1
 
-                if messages_received > 3 then
+                if messages_received > 100 then
                     -- If we keep receiving messages we should hand
                     -- back to the UI thread for a bit.
                     break
