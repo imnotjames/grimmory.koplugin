@@ -330,11 +330,23 @@ function Grimmory:onGrimmorySync(verbose)
             )
         end
 
-        local indeterminate_progress = 0
+        local last_progress_step = 0
         local session_count = 0
         local session_error_count = 0
         local book_count = 0
         local book_error_count = 0
+
+        local update_progress_step = function(progress_step)
+            if progress_step <= last_progress_step then
+                return
+            end
+
+            last_progress_step = progress_step
+
+            if update_callback ~= nil then
+                pcall(update_callback, progress_step, 10)
+            end
+        end
 
         -- In the future, we should limit what we sync
         -- to current or recent books.  For now, we sync everything.
@@ -353,9 +365,34 @@ function Grimmory:onGrimmorySync(verbose)
                     return
                 end
 
-                indeterminate_progress = (indeterminate_progress + 1) % 20
-                if update_callback ~= nil then
-                    pcall(update_callback, indeterminate_progress, 20)
+                if progress.state == "push-book-metadata" then
+                    local pushed_books = progress.pushed_books or 0
+                    local total_books = progress.total_books or 0
+
+
+                    if total_books == 0 then
+                        pushed_books = 1
+                        total_books = 1
+                    end
+
+                    update_progress_step(math.floor((pushed_books / total_books) * 3))
+                end
+
+                if progress.state:find("^shelf-") ~= nil then
+                    -- If we are still seeing shelves we are at step 3
+                    update_progress_step(3)
+                end
+
+                if progress.state == "book-page" then
+                    local viewed_books = progress.viewed_books or 0
+                    local total_books = progress.total_books or 0
+
+                    if total_books == 0 then
+                        viewed_books = 1
+                        total_books = 1
+                    end
+
+                    update_progress_step(4 + math.floor((viewed_books / total_books) * 5))
                 end
 
                 if progress.state == "session-recorded" then

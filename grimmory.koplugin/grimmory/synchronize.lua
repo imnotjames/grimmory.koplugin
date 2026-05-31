@@ -151,12 +151,20 @@ function GrimmorySynchronize:pushAllPendingBookMetadata(callback)
         self.settings:getSyncReadingProgress()
     )
 
-    for _, book_id in ipairs(book_ids) do
+    for index, book_id in ipairs(book_ids) do
         if book_id == nil then
             break
         end
 
-        self:pushBookMetadata(book_id, callback)
+        pcall(self.pushBookMetadata, self, book_id, callback)
+
+        callback({
+            state = "push-book-metadata",
+            book_id = book_id,
+            pushed_books = index,
+            total_books = #book_ids,
+        })
+
     end
 end
 
@@ -538,11 +546,19 @@ function GrimmorySynchronize:pullBooks(callback)
     end
 
     local page = 0
+    local element_count = 0
 
     while true do
         logger:dbg("Fetching books to pull, page:", page)
 
-        local books_ok, books_batch = self.api:getBooksPage(page)
+        local books_ok, books_batch, total_books = self.api:getBooksPage(page)
+
+        callback({
+            state = "book-page",
+            page = 0,
+            viewed_books = element_count,
+            total_books = total_books,
+        })
 
         if books_ok and type(books_batch) == "table" then
             if #books_batch == 0 then
@@ -553,6 +569,8 @@ function GrimmorySynchronize:pullBooks(callback)
                 if self:isTargetBook(book) then
                     self:pullBook(book, callback)
                 end
+
+                element_count = element_count + 1
             end
         else
             logger:err("Something went wrong pulling books, stopping book sync")
