@@ -12,7 +12,7 @@ local Event = require("ui/event")
 local ReadCollection = require("readcollection")
 local WidgetContainer = require("ui/widget/container/widgetcontainer")
 
-local GrimmoryBookResolver = require("grimmory/book_resolver")
+local GrimmoryDocMetadata = require("grimmory/doc_metadata")
 local GrimmoryDialogManager = require("grimmory/ui/dialog_manager")
 local GrimmoryExecutor = require("grimmory/executor")
 local GrimmoryMenu = require("grimmory/ui/menu")
@@ -71,6 +71,8 @@ function Grimmory:init()
         settings = self.settings,
     })
 
+    self.doc_metadata = GrimmoryDocMetadata:new()
+
     self.reading_recorder = GrimmoryReadingRecorder:new({
         repository = self.repository,
         settings = self.settings,
@@ -86,8 +88,6 @@ function Grimmory:init()
     self.api = GrimmoryAPI:new({
         settings = self.settings
     })
-
-    self.book_resolver = GrimmoryBookResolver:new()
 
     self.reading_progress_manager = GrimmoryReadingProgressManager:new({
         ui = self.ui,
@@ -117,7 +117,7 @@ function Grimmory:init()
         settings = self.settings,
         repository = self.repository,
         api = self.api,
-        book_resolver = self.book_resolver,
+        doc_metadata = self.doc_metadata,
         reading_progress_manager = self.reading_progress_manager,
     })
 
