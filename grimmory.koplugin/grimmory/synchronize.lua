@@ -485,27 +485,12 @@ function GrimmorySynchronize:pullBook(book, callback)
             local ok, message = self:downloadBook(book.id, download_path)
             if ok then
                 logger:info("Book downloaded:", book.id, " - ", download_path)
-                callback({
-                    state = "book-downloaded",
-                    book_id = book.id,
-                    download_path = download_path,
-                })
                 book_exists = true
             else
-                logger:err("Book failed download:", book.id, "-", message)
-                callback({
-                    state = "book-error",
-                    book_id = book.id,
-                    download_path = download_path,
-                })
+                error(message)
             end
         else
-            logger:err("Book skipped as download path could not be found")
-            callback({
-                state = "book-skipped",
-                book_id = book.id,
-                download_path = download_path,
-            })
+            error("Download path could not be found")
         end
     end
 
@@ -515,6 +500,8 @@ function GrimmorySynchronize:pullBook(book, callback)
         self:associateWithShelves(download_path, book.shelves)
         self.repository:upsertBook(download_path, book.id)
     end
+
+    return download_path
 end
 
 function GrimmorySynchronize:pullBooks(callback)
@@ -551,11 +538,25 @@ function GrimmorySynchronize:pullBooks(callback)
 
             for _, book in ipairs(books_batch) do
                 if self:isTargetBook(book) then
-                    self:pullBook(book, callback)
+                    local pull_ok, pull_path_or_message = pcall(self.pullBook, self, book, callback)
+                    if pull_ok then
+                        callback({
+                            state = "book-downloaded",
+                            book_id = book.id,
+                            download_path = pull_path_or_message,
+                        })
+                    else
+                        logger:err("Book failed to pull:", book.id, "-", pull_path_or_message)
+                        callback({
+                            state = "book-error",
+                            book_id = book.id,
+                            message = pull_path_or_message,
+                        })
+                    end
                 end
             end
         else
-            logger:err("Something went wrong pulling books, stopping book sync")
+            logger:err("Something went wrong reading books from server, stopping book sync")
             break
         end
 
