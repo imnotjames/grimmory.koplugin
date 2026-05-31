@@ -375,7 +375,8 @@ function GrimmoryAPI:getBooks()
 end
 
 ---@return boolean ok
----@return Book[] | string
+---@return Book[] | string page_books
+---@return number total_count
 function GrimmoryAPI:getBooksPage(page_number)
     local ok, _, body = self:request(
         "GET",
@@ -384,7 +385,7 @@ function GrimmoryAPI:getBooksPage(page_number)
 
     if not ok or type(body) == "string" then
         logger:err("Could not get books", body)
-        return ok, body
+        return ok, body, 0
     end
 
     local books = {}
@@ -395,7 +396,12 @@ function GrimmoryAPI:getBooksPage(page_number)
         end
     end
 
-    return ok, books
+    local total_count = 0
+    if type(body.page) == "table" and type(body.page.totalElements) == "number" then
+        total_count = body.page.totalElements
+    end
+
+    return ok, books, total_count
 end
 
 function GrimmoryAPI:downloadBook(book_id, destination_path)
