@@ -315,7 +315,7 @@ function Grimmory:onGrimmorySync(verbose)
         logger:info("Synchronizing to Grimmory")
 
         local should_terminate = false
-        local terminated_early = true
+        local terminated_early = false
         local queue_terminate = function() should_terminate = true end
 
         self.is_synchronizing = true
@@ -391,7 +391,7 @@ function Grimmory:onGrimmorySync(verbose)
 
         if not ok then
             if terminated_early then
-                logger:info("Sync was interrupted by user")
+                logger:info("Sync was interrupted by user", result)
 
                 if verbose then
                     self.dialog_manager:toast(
