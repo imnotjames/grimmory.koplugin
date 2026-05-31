@@ -433,11 +433,14 @@ function GrimmorySynchronize:associateWithShelves(book_path, shelves)
     local remote_shelves = {}
     for _, shelf_id in ipairs(shelves) do
         local collection_name = shelf_id_to_name[tostring(shelf_id)]
-        remote_shelves[collection_name] = true
 
-        if collection_name and not local_shelves[collection_name] then
-            logger:dbg("Adding book to collection:", book_path, collection_name)
-            ReadCollection:addItem(book_path, collection_name)
+        if collection_name then
+            remote_shelves[collection_name] = true
+
+            if not local_shelves[collection_name] then
+                logger:dbg("Adding book to collection:", book_path, collection_name)
+                ReadCollection:addItem(book_path, collection_name)
+            end
         end
     end
 
