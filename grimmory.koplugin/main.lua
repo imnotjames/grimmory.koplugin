@@ -139,6 +139,13 @@ function Grimmory:onExit()
     self.executor:clear()
 end
 
+function Grimmory:onRestart()
+    logger:dbg("Restarting")
+
+    self.scheduler:clear()
+    self.executor:clear()
+end
+
 function Grimmory:onSuspend()
     logger:dbg("Device is suspending")
 
@@ -147,6 +154,8 @@ function Grimmory:onSuspend()
     if self.settings:getSyncOnSuspend() then
        self:onGrimmorySync(false)
     end
+
+    self.executor:clear()
 end
 
 function Grimmory:onResume()
