@@ -1,13 +1,25 @@
+local Cache = require("cache")
 local DocSettings = require("docsettings")
+local DocumentRegistry = require("document/documentregistry")
+local util = require("util")
+
+local GrimmoryLogger = require("grimmory/logger")
+local logger = GrimmoryLogger:new()
 
 ---@class GrimmoryDocMetadata
+---@field private props_cache any
 local DocMetadata = {}
 
-function DocMetadata:new(o)
-    o = o or {}
+function DocMetadata:new()
+    local o = {}
     setmetatable(o, self)
     self.__index = self
+    o:init()
     return o
+end
+
+function DocMetadata:init()
+    self.props_cache = Cache:new({ slots = 1024 })
 end
 
 function DocMetadata:getDocSettings(path)
@@ -17,24 +29,63 @@ function DocMetadata:getDocSettings(path)
 end
 
 function DocMetadata:getDocProps(path)
+    local book_md5 = util.partialMD5(path)
+
+    local cache_value = self.props_cache:get(book_md5)
+    if cache_value ~= nil then
+        logger:dbg("Props Cache Hit", path)
+        return cache_value
+    end
+
     local settings = self:getDocSettings(path)
 
     local props = settings:readSetting("doc_props")
 
-    if props == nil then
-        return {}
+    if props ~= nil then
+        self.props_cache:insert(book_md5, props)
+        return props
     end
 
-    return props
+    logger:dbg("Falling back to reading document directly")
+
+    -- If still no book_props, open the document to get them
+    local document = DocumentRegistry:hasProvider(path) and DocumentRegistry:openDocument(path)
+    if document then
+        local loaded = true
+        if document.loadDocument then -- CreDocument
+            -- load only metadata
+            if not document:loadDocument(false) then
+                -- failed loading, calling other methods would segfault
+                loaded = false
+            end
+        end
+
+        if loaded then
+            props = document:getProps()
+        end
+        document:close()
+    end
+
+    if props ~= nil then
+        self.props_cache:insert(book_md5, props)
+        return props
+    end
+
+    logger:dbg("No props can be found")
+
+    self.props_cache:insert(book_md5, {})
+    return {}
 end
 
 function DocMetadata:getIdentifiers(path)
     local props = self:getDocProps(path)
-    local identifiersProp = props.identifiers or ""
+    if type(props.identifiers) ~= "string" or props.identifiers == "" then
+        return {}
+    end
 
     local identifiers = {}
 
-    for key, value in identifiersProp:gmatch("([^\n]+):([^\n:]+)") do
+    for key, value in props.identifiers:gmatch("([^\n]+):([^\n:]+)") do
         identifiers[key:lower()] = value
     end
 
