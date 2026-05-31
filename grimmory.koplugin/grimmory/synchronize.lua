@@ -537,7 +537,7 @@ function GrimmorySynchronize:pullBooks(callback)
                 end
             end
         else
-            logger:info("Something went wrong pulling books, stopping book sync")
+            logger:err("Something went wrong pulling books, stopping book sync")
             break
         end
 
