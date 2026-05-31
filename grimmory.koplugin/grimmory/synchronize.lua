@@ -423,10 +423,10 @@ function GrimmorySynchronize:associateWithShelves(book_path, shelves)
 
         if shelf_id then
             shelf_id_to_name[tostring(shelf_id)] = collection_name
-        end
 
-        if ReadCollection.coll[collection_name][book_path] ~= nil then
-            local_shelves[collection_name] = true
+            if ReadCollection.coll[collection_name][book_path] ~= nil then
+                local_shelves[collection_name] = true
+            end
         end
     end
 
