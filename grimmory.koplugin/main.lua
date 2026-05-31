@@ -176,6 +176,9 @@ function Grimmory:onPowerOff()
     if self.settings:getSyncOnPowerOff() then
        self:onGrimmorySync(false)
     end
+
+    self.scheduler:clear()
+    self.executor:clear()
 end
 
 function Grimmory:onReaderReady()
