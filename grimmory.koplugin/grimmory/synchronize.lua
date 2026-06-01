@@ -619,4 +619,30 @@ function GrimmorySynchronize:synchronizeAll(callback)
     logger:info("Done synchronizing")
 end
 
+function GrimmorySynchronize:synchronizeBook(book_path, callback)
+    if not self:checkForHealthyServer() then
+        error("Cannot connect to valid server")
+    end
+
+    -- Get book ID
+    local book_ok, book_id = self.repository:upsertBook(book_path)
+
+    if not book_ok or not book_id then
+        error("Could not track book")
+    end
+
+    -- First, tell Grimmory about all of our reading
+    logger:info("Pushing pending book metadata:", book_path)
+    self:pushBookMetadata(book_id, callback)
+
+    -- Then, try to get progress
+    local progress_ok, progress_result = pcall(self.pullBookProgress, self, book_path)
+
+    if not progress_ok then
+        logger:warn("Could not pull progress for book:", book_path, "-", progress_result)
+    end
+
+    logger:info("Done synchronizing book:", book_path)
+end
+
 return GrimmorySynchronize
