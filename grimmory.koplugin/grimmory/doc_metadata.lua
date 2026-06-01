@@ -108,35 +108,6 @@ function DocMetadata:getIdentifier(path, typeOrTypes)
     return nil
 end
 
-function DocMetadata:setIdentifier(path, type, identifier)
-    local identifiers = self:getIdentifiers(path)
-
-    if tostring(identifiers[type]) == tostring(identifier) then
-        -- Do nothing, no change needed
-        return
-    end
-
-    identifiers[type] = identifier
-
-    local serialized = ""
-    for key, value in pairs(identifiers) do
-        if #serialized > 0 then
-            serialized = serialized .. "\n"
-        end
-
-        serialized = serialized .. key .. ":" .. value
-    end
-
-    local settings = self:getDocSettings(path)
-
-    local props = settings:readSetting("doc_props") or {}
-
-    props.identifiers = serialized
-
-    settings:saveSetting("doc_props", props)
-    settings:flush()
-end
-
 function DocMetadata:getISBN(path)
     return self:getIdentifier(
         path,
