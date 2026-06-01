@@ -63,6 +63,9 @@ local GrimmoryDocMetadata = require("grimmory/doc_metadata")
 describe("GrimmoryDocMetadata", function()
     before_each(function()
         fake_doc_settings["readSetting"] = stub:new({}, "readSetting")
+        for key in pairs(fake_cache) do
+            fake_cache[key] = nil
+        end
     end)
 
     describe("getIdentifier", function()
