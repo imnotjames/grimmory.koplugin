@@ -140,7 +140,13 @@ end
 function DocMetadata:getISBN(path)
     return self:getIdentifier(
         path,
-        { "isbn13", "isbn10", "isbn" }
+        {
+            "isbn13",
+            "urn:isbn13",
+            "isbn10",
+            "isbn",
+            "urn:isbn",
+        }
     )
 end
 
