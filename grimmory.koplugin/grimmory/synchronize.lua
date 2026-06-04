@@ -635,6 +635,13 @@ function GrimmorySynchronize:synchronizeBook(book_path, callback)
     logger:info("Pushing pending book metadata:", book_path)
     self:pushBookMetadata(book_id, callback)
 
+    callback({
+        state = "push-book-metadata",
+        book_id = book_id,
+        pushed_books = 1,
+        total_books = 1,
+    })
+
     -- Then, try to get progress
     local progress_ok, progress_result = pcall(self.pullBookProgress, self, book_path)
 
