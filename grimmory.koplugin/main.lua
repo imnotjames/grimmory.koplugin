@@ -62,6 +62,20 @@ function Grimmory:onDispatcherRegisterActions()
     title = _("Grimmory: Sync in Background"),
     general = true,
   })
+
+  Dispatcher:registerAction("grimmory_sync_open_book_foreground", {
+    category = "none",
+    event = "GrimmorySyncOpenBookForeground",
+    title = _("Grimmory: Sync Open Book Now"),
+    general = true,
+  })
+
+  Dispatcher:registerAction("grimmory_sync_open_book_background", {
+    category = "none",
+    event = "GrimmorySyncOpenBookBackground",
+    title = _("Grimmory: Sync Open Book in Background"),
+    general = true,
+  })
 end
 
 function Grimmory:init()
@@ -178,7 +192,7 @@ function Grimmory:onResume()
     logger:dbg("Device is resuming")
 
     if self.settings:getSyncReadingProgress() then
-        self:syncProgressForOpenBook()
+        self:pullProgressForOpenBook()
     end
 
     self.reading_recorder:onSessionStart()
@@ -198,7 +212,7 @@ function Grimmory:onReaderReady()
     logger:dbg("Document open and ready")
 
     if self.settings:getSyncReadingProgress() then
-        self:syncProgressForOpenBook()
+        self:pullProgressForOpenBook()
     end
 
     self.reading_recorder:onSessionStart()
@@ -270,7 +284,7 @@ function Grimmory:onSchedulePeriodicPush()
     end
 end
 
-function Grimmory:syncProgressForOpenBook()
+function Grimmory:pullProgressForOpenBook()
     if self.ui == nil or self.ui.document == nil or self.ui.document.file == nil then
         return
     end
@@ -321,6 +335,25 @@ end
 
 function Grimmory:onGrimmorySyncBackground()
     return self:onGrimmorySync(false)
+end
+
+function Grimmory:onGrimmorySyncOpenBookForeground()
+    return self:onGrimmorySyncOpenBook(true)
+end
+
+function Grimmory:onGrimmorySyncOpenBookBackground()
+    return self:onGrimmorySyncOpenBook(false)
+end
+
+function Grimmory:onGrimmorySyncOpenBook(verbose)
+    if self.ui == nil or self.ui.document == nil or self.ui.document.file == nil then
+        logger:info("No open book, skipping sync")
+        return
+    end
+
+    local book_path = self.ui.document.file
+
+    return self:onGrimmorySync(verbose, book_path)
 end
 
 function Grimmory:onGrimmorySync(verbose, book_path)
