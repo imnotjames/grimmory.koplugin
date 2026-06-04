@@ -11,6 +11,7 @@ local GrimmoryLogger = require("grimmory/logger")
 local logger = GrimmoryLogger:new()
 
 ---@class GrimmoryMenu
+---@field ui any This is a ReaderUI
 ---@field settings GrimmorySettings
 ---@field dialog_manager DialogManager
 ---@field updater GrimmorySelfUpdater
@@ -238,14 +239,9 @@ function GrimmoryMenu:getTopMenu()
         table.insert(
             menu, 1,
             {
-                text = _("Force Sync Now"),
+                text = _("Sync Everything Now"),
                 enabled_func = function()
-                    if self.settings:getBaseUri() == "" then
-                        logger:info("BaseURI is not configured, cannot sync")
-                        return false
-                    end
-
-                    return true
+                    return self.settings:getBaseUri() ~= ""
                 end,
                 callback = function()
                     UIManager:broadcastEvent(Event:new("GrimmorySync", true))
@@ -270,6 +266,21 @@ function GrimmoryMenu:getTopMenu()
                     end
                 end,
                 separator = true,
+            }
+        )
+    end
+
+    if self.ui ~= nil and self.ui.document ~= nil then
+        table.insert(
+            menu, 1,
+            {
+                text = _("Sync Open Book Now"),
+                enabled_func = function()
+                    return self.settings:getBaseUri() ~= "" and self.interrupt_sync == nil
+                end,
+                callback = function()
+                    UIManager:broadcastEvent(Event:new("GrimmorySyncOpenBook", true))
+                end,
             }
         )
     end
