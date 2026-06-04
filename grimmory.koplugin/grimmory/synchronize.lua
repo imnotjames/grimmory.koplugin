@@ -99,8 +99,8 @@ function GrimmorySynchronize:pushBookSessions(book_id, callback)
                 session.end_time,
                 session.start_progress,
                 session.end_progress,
-                session.start_xpointer,
-                session.end_xpointer
+                session.start_page,
+                session.end_page
             )
 
             local ok, body = self.api:recordSession(
@@ -109,8 +109,8 @@ function GrimmorySynchronize:pushBookSessions(book_id, callback)
                 session.end_time,
                 session.start_progress,
                 session.end_progress,
-                session.start_xpointer,
-                session.end_xpointer
+                tostring(session.start_page),
+                tostring(session.end_page)
             )
 
             if ok then
