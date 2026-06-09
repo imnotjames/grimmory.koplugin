@@ -372,7 +372,7 @@ end
 ---@param book Book
 ---@return string | nil download_path
 function GrimmorySynchronize:getBookDownloadPath(book)
-    local existing_book_ok, existing_book_path = self.repository:getBookInfo(book.id)
+    local existing_book_ok, existing_book_path = self.repository:findBookByGrimmoryId(book.id)
     if existing_book_ok and existing_book_path then
         return existing_book_path
     end

@@ -213,7 +213,7 @@ end
 ---@return boolean ok
 ---@return string | nil book_path
 ---@return string | nil book_md5
-function GrimmoryLocalRepository:getBookInfo(grimmory_id)
+function GrimmoryLocalRepository:findBookByGrimmoryId(grimmory_id)
     local ok, book = self:withDatabase(
         function(conn)
             local select_stmt = conn:prepare([[
