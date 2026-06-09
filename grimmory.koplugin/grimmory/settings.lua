@@ -276,6 +276,7 @@ end
 
 function GrimmorySettings:toggleSyncOnCloseDocument()
     self.data.sync_on_close_document = not self:getSyncOnCloseDocument()
+    self:write()
 end
 
 function GrimmorySettings:getSyncOnSuspend()
