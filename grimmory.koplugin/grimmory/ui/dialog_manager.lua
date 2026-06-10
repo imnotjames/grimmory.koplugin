@@ -143,7 +143,7 @@ function DialogManager:showTargetShelvesSettings()
                 text = _("All Shelves"),
                 callback = function()
                     logger:dbg("Set target shelves to All Shelves")
-                    self.settings:setSyncTargetShelves({})
+                    self.settings:setDownloadTargetShelves({})
 
                     UIManager:broadcastEvent(Event:new("GrimmorySettingsChanged"))
 
@@ -173,7 +173,7 @@ function DialogManager:showTargetShelvesSettings()
                     text = uniqueShelfName,
                     callback = function()
                         logger:dbg("Set target shelves to shelf ID", shelfId)
-                        self.settings:setSyncTargetShelves({ { id = shelfId, name = uniqueShelfName } })
+                        self.settings:setDownloadTargetShelves({ { id = shelfId, name = uniqueShelfName } })
 
                         UIManager:broadcastEvent(Event:new("GrimmorySettingsChanged"))
 
@@ -283,9 +283,9 @@ function DialogManager:showDownloadDirectorySettings()
         title = "Download Directory",
         select_file = false,
         show_files = false,
-        path = self.settings:getSyncDownloadDirectory(),
+        path = self.settings:getDownloadDirectory(),
         onConfirm = function(newPath)
-            self.settings:setSyncDownloadDirectory(newPath)
+            self.settings:setDownloadDirectory(newPath)
         end,
     })
 

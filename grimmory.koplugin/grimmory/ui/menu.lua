@@ -174,33 +174,8 @@ function GrimmoryMenu:getSyncOptionsMenu()
     }
 end
 
-function GrimmoryMenu:getTopMenu()
-    local menu = {
-        {
-            text = _("Connection Settings"),
-            callback = function()
-                self.dialog_manager:showConnectionSettings()
-            end,
-        },
-        {
-            text = _("Automatic Sync"),
-            sub_item_table = self:getAutomaticSyncOptionsMenu()
-        },
-        {
-            text = _("Sync Configuration"),
-            sub_item_table = self:getSyncOptionsMenu(),
-            separator = true,
-        },
-        {
-            text = _("Download Books"),
-            checked_func = function()
-                return self.settings:getSyncShelves()
-            end,
-            callback = function()
-                self.settings:toggleSyncShelves()
-                UIManager:broadcastEvent(Event:new("GrimmorySettingsChanged"))
-            end,
-        },
+function GrimmoryMenu:getDownloadOptionsMenu()
+    return {
         {
             text = _("Set Download Directory"),
             callback = function()
@@ -211,7 +186,7 @@ function GrimmoryMenu:getTopMenu()
             text_func = function()
                 local targetDescription = "All"
 
-                local targetShelves = self.settings:getSyncTargetShelves()
+                local targetShelves = self.settings:getDownloadTargetShelves()
 
                 local count = 0
                 for _, shelf in ipairs(targetShelves) do
@@ -236,6 +211,41 @@ function GrimmoryMenu:getTopMenu()
             callback = function()
                 self.dialog_manager:showTargetShelvesSettings()
             end,
+            separator = true,
+        },
+    }
+end
+
+function GrimmoryMenu:getTopMenu()
+    local menu = {
+        {
+            text = _("Connection Settings"),
+            callback = function()
+                self.dialog_manager:showConnectionSettings()
+            end,
+        },
+        {
+            text = _("Automatic Sync"),
+            sub_item_table = self:getAutomaticSyncOptionsMenu()
+        },
+        {
+            text = _("Sync Configuration"),
+            sub_item_table = self:getSyncOptionsMenu(),
+            separator = true,
+        },
+        {
+            text = _("Download Books"),
+            checked_func = function()
+                return self.settings:getDownloadsBooks()
+            end,
+            callback = function()
+                self.settings:toggleDownloadsBooks()
+                UIManager:broadcastEvent(Event:new("GrimmorySettingsChanged"))
+            end,
+        },
+        {
+            text = _("Download Configuration"),
+            sub_item_table = self:getDownloadOptionsMenu(),
             separator = true,
         },
         {

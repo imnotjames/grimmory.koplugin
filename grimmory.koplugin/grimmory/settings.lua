@@ -185,7 +185,7 @@ function GrimmorySettings:setSessionThresholdPages(pages)
     self:write()
 end
 
-function GrimmorySettings:getSyncShelves()
+function GrimmorySettings:getDownloadsBooks()
     if self.data.sync_shelves == nil then
         return DEFAULTS.sync_shelves
     end
@@ -193,27 +193,27 @@ function GrimmorySettings:getSyncShelves()
     return self.data.sync_shelves
 end
 
-function GrimmorySettings:toggleSyncShelves()
-    self.data.sync_shelves = not self:getSyncShelves()
+function GrimmorySettings:toggleDownloadsBooks()
+    self.data.sync_shelves = not self:getDownloadsBooks()
     self:write()
 end
 
-function GrimmorySettings:getSyncDownloadDirectory()
+function GrimmorySettings:getDownloadDirectory()
     return self.data.sync_download_directory or DEFAULTS.sync_download_directory
 end
 
 ---@param directory string
-function GrimmorySettings:setSyncDownloadDirectory(directory)
+function GrimmorySettings:setDownloadDirectory(directory)
     self.data.sync_download_directory = directory
     self:write()
 end
 
-function GrimmorySettings:getSyncTargetShelves()
+function GrimmorySettings:getDownloadTargetShelves()
     return self.data.sync_target_shelves or DEFAULTS.sync_target_shelves
 end
 
 ---@param target_shelves GrimmoryTargetShelf[]
-function GrimmorySettings:setSyncTargetShelves(target_shelves)
+function GrimmorySettings:setDownloadTargetShelves(target_shelves)
     self.data.sync_target_shelves = target_shelves
     self:write()
 end

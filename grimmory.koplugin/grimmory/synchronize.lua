@@ -175,7 +175,7 @@ function GrimmorySynchronize:isTargetBook(book)
         return false
     end
 
-    local target_shelves = self.settings:getSyncTargetShelves() or {}
+    local target_shelves = self.settings:getDownloadTargetShelves() or {}
 
     if #target_shelves == 0 then
         return true
@@ -195,7 +195,7 @@ function GrimmorySynchronize:isTargetBook(book)
 end
 
 function GrimmorySynchronize:isTargetShelf(shelf_id)
-    local target_shelves = self.settings:getSyncTargetShelves() or {}
+    local target_shelves = self.settings:getDownloadTargetShelves() or {}
 
     if #target_shelves == 0 then
         return true
@@ -211,7 +211,7 @@ function GrimmorySynchronize:isTargetShelf(shelf_id)
 end
 
 function GrimmorySynchronize:synchronizeShelves(callback)
-    if not self.settings:getSyncShelves() then
+    if not self.settings:getDownloadsBooks() then
         logger:info("Shelf sync skipped because feature is disabled")
         return
     end
@@ -377,7 +377,7 @@ function GrimmorySynchronize:getBookDownloadPath(book)
         return existing_book_path
     end
 
-    local download_directory = self.settings:getSyncDownloadDirectory()
+    local download_directory = self.settings:getDownloadDirectory()
 
     if not download_directory or download_directory == "" then
         error("Download directory is invalid")
@@ -513,12 +513,12 @@ function GrimmorySynchronize:pullBook(book, callback)
 end
 
 function GrimmorySynchronize:pullBooks(callback)
-    if not self.settings:getSyncShelves() then
+    if not self.settings:getDownloadsBooks() then
         logger:info("Book download skipped because feature is disabled")
         return
     end
 
-    local download_directory = self.settings:getSyncDownloadDirectory()
+    local download_directory = self.settings:getDownloadDirectory()
     if not download_directory or download_directory == "" then
         logger:err("Book download skipped because download directory is not set")
         return
