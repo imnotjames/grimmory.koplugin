@@ -532,53 +532,28 @@ function GrimmorySynchronize:pullBooks(callback)
         return
     end
 
-    local page = 0
-    local element_count = 0
-
-    while true do
-        logger:dbg("Fetching books to pull, page:", page)
-
-        local books_ok, books_batch, total_books = self.api:getBooksPage(page)
-
-        callback({
-            state = "book-page",
-            page = 0,
-            viewed_books = element_count,
-            total_books = total_books,
-        })
-
-        if books_ok and type(books_batch) == "table" then
-            if #books_batch == 0 then
-                break
+    for book, element_count, total_books in self.api:getBooks() do
+        if self:isTargetBook(book) then
+            local pull_ok, pull_path_or_message = pcall(self.pullBook, self, book, callback)
+            if pull_ok then
+                callback({
+                    state = "book-downloaded",
+                    book_id = book.id,
+                    download_path = pull_path_or_message,
+                    viewed_books = element_count,
+                    total_books = total_books,
+                })
+            else
+                logger:err("Book failed to pull:", book.id, "-", pull_path_or_message)
+                callback({
+                    state = "book-error",
+                    book_id = book.id,
+                    message = pull_path_or_message,
+                    viewed_books = element_count,
+                    total_books = total_books,
+                })
             end
-
-            for _, book in ipairs(books_batch) do
-                if self:isTargetBook(book) then
-                    local pull_ok, pull_path_or_message = pcall(self.pullBook, self, book, callback)
-                    if pull_ok then
-                        callback({
-                            state = "book-downloaded",
-                            book_id = book.id,
-                            download_path = pull_path_or_message,
-                        })
-                    else
-                        logger:err("Book failed to pull:", book.id, "-", pull_path_or_message)
-                        callback({
-                            state = "book-error",
-                            book_id = book.id,
-                            message = pull_path_or_message,
-                        })
-                    end
-                end
-
-                element_count = element_count + 1
-            end
-        else
-            logger:err("Something went wrong reading books from server, stopping book sync")
-            break
         end
-
-        page = page + 1
     end
 
     -- During pulling books we may have updated the collections that

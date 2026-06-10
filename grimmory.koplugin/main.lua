@@ -447,7 +447,7 @@ function Grimmory:onGrimmorySync(verbose, book_path)
                     update_progress_step(3)
                 end
 
-                if progress.state == "book-page" then
+                if progress.state == "book-downloaded" or progress.state == "book-error" then
                     local viewed_books = progress.viewed_books or 0
                     local total_books = progress.total_books or 0
 

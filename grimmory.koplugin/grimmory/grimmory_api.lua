@@ -353,28 +353,6 @@ function GrimmoryAPI:getServerVersion()
 end
 
 ---@return boolean ok
----@return Book[] | string
-function GrimmoryAPI:getBooks()
-    local ok, _, body = self:request(
-        "GET",
-        "/api/v1/books?stripForListView=false"
-    )
-
-    if not ok or type(body) == "string" then
-        logger:err("Could not get books", body)
-        return ok, body
-    end
-
-    local books = {}
-
-    for _, raw_book in ipairs(body) do
-        table.insert(books, parseBook(raw_book))
-    end
-
-    return ok, books
-end
-
----@return boolean ok
 ---@return Book[] | string page_books
 ---@return number total_count
 function GrimmoryAPI:getBooksPage(page_number)
@@ -402,6 +380,54 @@ function GrimmoryAPI:getBooksPage(page_number)
     end
 
     return ok, books, total_count
+end
+
+---@return (fun(): (Book | nil, integer, integer))
+function GrimmoryAPI:getBooks()
+    local page = 0
+    local batch_index = 0
+    local book_index = 0
+
+    local books_ok, books_batch, total_books = self:getBooksPage(page)
+
+    if not books_ok then
+        logger:err("Unable to read books:", books_batch)
+        return function()
+            return nil, 0, 0
+        end
+    end
+
+    return function ()
+        if type(books_batch) ~= "table" or #books_batch == 0 then
+            return nil, book_index, total_books
+        end
+
+        if batch_index >= #books_batch then
+            -- If current_index is past the current batch
+            page = page + 1
+
+            local new_books_ok, new_books_batch, new_total_books = self:getBooksPage(page)
+            batch_index = 0
+
+            if not new_books_ok or type(new_books_batch) ~= "table" then
+                logger:err("Unable to read books:", new_books_batch)
+
+                -- Set the books batch to empty so we basically stop iteration
+                books_batch = {}
+
+                return nil, book_index, total_books
+            end
+
+            books_batch = new_books_batch
+            total_books = new_total_books
+        end
+
+        batch_index = batch_index + 1
+        book_index = book_index + 1
+
+        return books_batch[batch_index], book_index, total_books
+    end
+
 end
 
 function GrimmoryAPI:downloadBook(book_id, destination_path)
