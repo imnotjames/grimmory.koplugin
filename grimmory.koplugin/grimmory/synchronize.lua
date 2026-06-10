@@ -370,7 +370,7 @@ function GrimmorySynchronize:downloadBook(book_id, download_path)
 end
 
 ---@param book Book
----@return string | nil download_path
+---@return string download_path
 function GrimmorySynchronize:getBookDownloadPath(book)
     local existing_book_ok, existing_book_path = self.repository:findBookByGrimmoryId(book.id)
     if existing_book_ok and existing_book_path then
@@ -383,29 +383,35 @@ function GrimmorySynchronize:getBookDownloadPath(book)
         error("Download directory is invalid")
     end
 
-    local download_path = download_directory .. "/" .. util.getSafeFilename(book.primary_file.filename)
+    if book.primary_file then
+        local download_path = download_directory .. "/" .. util.getSafeFilename(book.primary_file.filename)
 
-    -- If this path doesn't exist yet, we're good, bail early
-    if not util.fileExists(download_path) then
-        return download_path
-    end
+        -- If this path doesn't exist yet, we're good, bail early
+        if not util.fileExists(download_path) then
+            return download_path
+        end
 
-    -- If the path exists we have to check to make sure that it is actually the book we care about
-    if self.doc_metadata:isBook(download_path, book) then
-        -- We have a match, this path is safe.
-        return download_path
+        -- If the path exists we have to check to make sure that it is actually the book we care about
+        if self.doc_metadata:isBook(download_path, book) then
+            -- We have a match, this path is safe.
+            return download_path
+        end
     end
 
     -- At this point we need a fallback name.  `downloaded-${BOOK_ID}.${EXT}` is not
     -- great but I don't know a better safe way off hand.
 
-    local file_extension = util.getFileNameSuffix(book.primary_file.filename)
+    local file_extension = nil
+
+    if book.primary_file ~= nil then
+        file_extension = util.getFileNameSuffix(book.primary_file.filename)
+    end
 
     if file_extension == "" or file_extension == nil then
         file_extension = "bin"
     end
 
-    download_path = download_directory .. "/downloaded-" .. tonumber(book.id) .. "." .. file_extension
+    local download_path = download_directory .. "/downloaded-" .. tonumber(book.id) .. "." .. file_extension
 
     -- If this path doesn't exist yet, we're good?
     if not util.fileExists(download_path) then
@@ -463,19 +469,9 @@ end
 
 
 ---@param book Book
----@param callback function
-function GrimmorySynchronize:pullBook(book, callback)
+---@return string download_path
+function GrimmorySynchronize:pullBook(book)
     local book_exists = false
-
-    if book.primary_file == nil then
-        logger:dbg("Skipping book without file:", book.id)
-        callback({
-            state = "book-skipped",
-            book_id = book.id,
-            download_path = nil,
-        })
-        return
-    end
 
     local download_path = self:getBookDownloadPath(book)
 
@@ -512,6 +508,25 @@ function GrimmorySynchronize:pullBook(book, callback)
     return download_path
 end
 
+---@param book_path string
+function GrimmorySynchronize:removeBook(book_path)
+    logger:info("Removing book at:", book_path)
+
+    -- Remove book file
+    local ok = util.removeFile(book_path)
+
+    if not ok then
+        logger:err("Failed to remove file at:", book_path)
+        return
+    end
+
+    -- Remove from all collections (skip writes)
+    ReadCollection:removeItem(book_path, nil, true)
+
+    -- Remove sidecar
+    self.doc_metadata:purge(book_path)
+end
+
 function GrimmorySynchronize:pullBooks(callback)
     if not self.settings:getDownloadsBooks() then
         logger:info("Book download skipped because feature is disabled")
@@ -532,10 +547,17 @@ function GrimmorySynchronize:pullBooks(callback)
         return
     end
 
+    local seen_books = {}
+    local seen_grimmory_ids = {}
+
     for book, element_count, total_books in self.api:getBooks() do
         if self:isTargetBook(book) then
+            seen_grimmory_ids[tostring(book.id)] = true
+
             local pull_ok, pull_path_or_message = pcall(self.pullBook, self, book, callback)
             if pull_ok then
+                seen_books[pull_path_or_message] = true
+
                 callback({
                     state = "book-downloaded",
                     book_id = book.id,
@@ -554,6 +576,45 @@ function GrimmorySynchronize:pullBooks(callback)
                 })
             end
         end
+    end
+
+    if self.settings:getDownloadRemoveBooks() then
+        logger:dbg("Checking if any books need to be removed")
+
+        -- Iterate through books in download directory and
+        -- remove when not in the `seen_books` set
+        util.findFiles(
+            download_directory,
+            function(path)
+                if path:match("%.sdr/") then
+                    -- Ignore sidecar directory
+                    return
+                end
+
+                if seen_books[path] then
+                    -- We saw this specific file and can skip
+                    -- We don't need to do the database lookup
+                    return
+                end
+
+                local partial_md5 = util.partialMD5(path)
+                local found_ok, _, grimmory_id = self.repository:findBookByFile(path, partial_md5)
+
+                if not found_ok or not grimmory_id then
+                    -- Skip file, not tracked in database for some reason
+                    logger:dbg("Skipping file removal, not in database:", path, partial_md5)
+                    return
+                end
+
+                if seen_grimmory_ids[tostring(grimmory_id)] then
+                    -- We saw this Grimmory ID as a valid book to keep on-device.
+                    return
+                end
+
+                self:removeBook(path)
+            end,
+            true
+        )
     end
 
     -- During pulling books we may have updated the collections that

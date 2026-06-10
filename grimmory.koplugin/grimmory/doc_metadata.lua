@@ -22,6 +22,14 @@ function DocMetadata:init()
     self.props_cache = Cache:new({ slots = 1024 })
 end
 
+function DocMetadata:purge(path)
+    local settings = self:getDocSettings(path)
+
+    if settings ~= nil then
+        settings:purge()
+    end
+end
+
 function DocMetadata:getDocSettings(path)
     local settings = DocSettings:open(path)
 

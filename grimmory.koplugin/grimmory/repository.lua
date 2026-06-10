@@ -209,6 +209,53 @@ function GrimmoryLocalRepository:upsertBook(book_path, grimmory_id)
     return true, book_id
 end
 
+---@param book_path string
+---@param partial_md5 string
+---@return boolean ok
+---@return integer | nil book_id
+---@return integer | nil grimmory_id
+function GrimmoryLocalRepository:findBookByFile(book_path, partial_md5)
+    local ok, book = self:withDatabase(
+        function(conn)
+            local select_stmt = conn:prepare([[
+                SELECT
+                    id,
+                    grimmory_id
+                FROM book
+                WHERE
+                    book_path = ?
+                    AND
+                    partial_md5 = ?
+            ]])
+
+            select_stmt:bind(book_path, partial_md5)
+            local row = select_stmt:step()
+            select_stmt:close()
+
+            if not row then
+                return nil
+            end
+
+            return {
+                id = tonumber(row[1]),
+                grimmory_id = tonumber(row[2]),
+            }
+        end
+    )
+
+    if not ok then
+        logger:err("Failed to find book:", book_path, partial_md5, "-", book)
+        return false, nil, nil
+    end
+
+    if not book then
+        logger:dbg("Book query succees but did not find book:", book_path, partial_md5)
+        return true, nil, nil
+    end
+
+    return true, book.id, book.grimmory_id
+end
+
 ---@param grimmory_id number
 ---@return boolean ok
 ---@return string | nil book_path
