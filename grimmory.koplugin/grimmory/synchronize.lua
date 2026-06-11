@@ -211,7 +211,7 @@ function GrimmorySynchronize:isTargetShelf(shelf_id)
 end
 
 function GrimmorySynchronize:synchronizeShelves(callback)
-    if not self.settings:getDownloadsBooks() then
+    if not self.settings:getSyncShelves() then
         logger:info("Shelf sync skipped because feature is disabled")
         return
     end
@@ -228,7 +228,7 @@ function GrimmorySynchronize:synchronizeShelves(callback)
 
     -- Make sure we have our unique shelf names and ID mappings
     for _, shelf in ipairs(shelves) do
-        if shelf.id and shelf.name and self:isTargetShelf(shelf.id) then
+        if shelf.id and shelf.name then
             local shelf_name = shelf.name
 
             logger:dbg("Shelf received from Grimmory", shelf.id, shelf_name)
@@ -334,6 +334,35 @@ function GrimmorySynchronize:synchronizeShelves(callback)
     ReadCollection:write()
 end
 
+function GrimmorySynchronize:removeEmptyShelves(callback)
+    if self.settings:getSyncRetainEmptyShelves() then
+        logger:info("Shelf clean up sync skipped because feature is disabled")
+        return
+    end
+
+    -- Read through existing collections and compare against shelves
+    for collection_name, _ in pairs(ReadCollection.coll) do
+        local shelf_id = ReadCollection.coll_settings[collection_name].connectorId
+        local books = ReadCollection:getOrderedCollection(collection_name)
+
+        if shelf_id and #books == 0 then
+            -- This is a grimmory shelf and is empty
+            logger:info("Removing empty shelf:", collection_name)
+
+            callback({
+                state = "shelf-remove",
+                shelf_id = shelf_id,
+                shelf_name = collection_name,
+            })
+
+            ReadCollection:removeCollection(collection_name)
+        end
+    end
+
+    -- Persist collections to the database now that we've finished our sync
+    ReadCollection:write()
+end
+
 function GrimmorySynchronize:pullBookProgress(book_path)
     if not self.settings:getSyncReadingProgress() then
         return
@@ -429,6 +458,8 @@ function GrimmorySynchronize:getBookDownloadPath(book)
     return download_path
 end
 
+---@param book_path string
+---@param shelves integer[]
 function GrimmorySynchronize:associateWithShelves(book_path, shelves)
     local local_shelves = {}
     local shelf_id_to_name = {}
@@ -501,7 +532,7 @@ function GrimmorySynchronize:pullBook(book)
     if book_exists and download_path then
         -- After we're done, if the book exists we should attach it
         -- to associated shelves.
-        self:associateWithShelves(download_path, book.shelves)
+        self:associateWithShelves(download_path, book.shelves or {})
         self.repository:upsertBook(download_path, book.id)
     end
 
@@ -651,6 +682,9 @@ function GrimmorySynchronize:synchronizeAll(callback)
     -- reading progress may change the books we sync down
     logger:info("Pulling books")
     self:pullBooks(callback)
+
+    -- Clean up empty shelves
+    self:removeEmptyShelves(callback)
 
     logger:info("Done synchronizing")
 end

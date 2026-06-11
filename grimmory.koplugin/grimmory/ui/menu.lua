@@ -170,6 +170,30 @@ function GrimmoryMenu:getSyncOptionsMenu()
                 self.settings:toggleSyncReadingProgress()
                 UIManager:broadcastEvent(Event:new("GrimmorySettingsChanged"))
             end,
+            separator = true,
+        },
+        {
+            text = _("Sync Shelves"),
+            checked_func = function()
+                return self.settings:getSyncShelves()
+            end,
+            callback = function()
+                self.settings:toggleSyncShelves()
+                UIManager:broadcastEvent(Event:new("GrimmorySettingsChanged"))
+            end,
+        },
+        {
+            text = _("Sync Empty Shelves"),
+            enabled_func = function()
+                return self.settings:getSyncShelves()
+            end,
+            checked_func = function()
+                return self.settings:getSyncShelves() and self.settings:getSyncEmptyShelves()
+            end,
+            callback = function()
+                self.settings:toggleSyncEmptyShelves()
+                UIManager:broadcastEvent(Event:new("GrimmorySettingsChanged"))
+            end,
         },
     }
 end
