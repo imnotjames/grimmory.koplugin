@@ -21,6 +21,7 @@ local logger = GrimmoryLogger:new()
 ---@field base_uri string
 ---@field username string
 ---@field password string
+---@field extra_headers { [string]: string }
 ---@field session_threshold_seconds number
 ---@field session_threshold_pages number
 ---@field sync_on_close_document boolean
@@ -43,6 +44,7 @@ local logger = GrimmoryLogger:new()
 ---@type GrimmorySettingsData
 local DEFAULTS = {
     automatic_check_updates = false,
+    extra_headers = {},
     base_uri = "",
     username = "",
     password = "",
@@ -150,6 +152,15 @@ end
 function GrimmorySettings:setBaseUri(uri)
     uri = tostring(uri or ""):gsub("/*$", "")
     self.data.base_uri = uri
+    self:write()
+end
+
+function GrimmorySettings:getExtraHeaders()
+    return self.data.extra_headers or DEFAULTS.extra_headers
+end
+
+function GrimmorySettings:setExtraHeaders(headers)
+    self.data.extra_headers = headers
     self:write()
 end
 
