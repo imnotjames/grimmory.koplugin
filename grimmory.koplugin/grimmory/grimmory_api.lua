@@ -175,6 +175,10 @@ function GrimmoryAPI:rawRequest(method, uri, data, headers, sink)
 
     headers["User-Agent"] = getUserAgent()
 
+    for key, value in pairs(self.settings:getExtraHeaders()) do
+        headers[key] = value
+    end
+
     local client
     if uri:match("^http:") then
         client = http
