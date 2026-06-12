@@ -36,15 +36,6 @@ package.preload["cache"] = function()
 end
 
 local fake_document = stub.new()
-local mock_has_provider = spy.new(function() return true end)
-local mock_open_document = spy.new(function() return fake_document end)
-
-package.preload["document/documentregistry"] = function()
-    return {
-        hasProvider = mock_has_provider,
-        openDocument = mock_open_document,
-    }
-end
 
 local GrimmoryCFIResolver = require("grimmory/cfi_resolver")
 
@@ -80,7 +71,7 @@ describe("GrimmoryCFIResolver", function()
 
     describe("cfiToXpointer", function()
         it("converts simple xpointer", function()
-            local cfi_resolver = GrimmoryCFIResolver:new("example.html")
+            local cfi_resolver = GrimmoryCFIResolver:new(fake_document)
 
             local actual = cfi_resolver:cfiToXpointer(
                 "epubcfi(/6/24!/4/2/4)"
@@ -93,7 +84,7 @@ describe("GrimmoryCFIResolver", function()
         end)
 
         it("converts xpointer referencing second occurrence", function()
-            local cfi_resolver = GrimmoryCFIResolver:new("example.html")
+            local cfi_resolver = GrimmoryCFIResolver:new(fake_document)
 
             local actual = cfi_resolver:cfiToXpointer(
                 "epubcfi(/6/24!/4/2/6)"
@@ -106,7 +97,7 @@ describe("GrimmoryCFIResolver", function()
         end)
 
         it("converts xpointer referencing text", function()
-            local cfi_resolver = GrimmoryCFIResolver:new("example.html")
+            local cfi_resolver = GrimmoryCFIResolver:new(fake_document)
 
             local actual = cfi_resolver:cfiToXpointer(
                 "epubcfi(/6/24!/4/2/4/1:3)"
@@ -119,7 +110,7 @@ describe("GrimmoryCFIResolver", function()
         end)
 
         it("converts xpointer mapping text offsets", function()
-            local cfi_resolver = GrimmoryCFIResolver:new("example.html")
+            local cfi_resolver = GrimmoryCFIResolver:new(fake_document)
 
             local actual = cfi_resolver:cfiToXpointer(
                 "epubcfi(/6/24!/4/2/6/1:19)"
@@ -132,7 +123,7 @@ describe("GrimmoryCFIResolver", function()
         end)
 
         it("converts xpointer referencing text in between elements", function()
-            local cfi_resolver = GrimmoryCFIResolver:new("example.html")
+            local cfi_resolver = GrimmoryCFIResolver:new(fake_document)
 
             local actual = cfi_resolver:cfiToXpointer(
                 "epubcfi(/6/24!/4/2/6/3:3)"
@@ -147,7 +138,7 @@ describe("GrimmoryCFIResolver", function()
 
     describe("xpointerToCFI", function()
         it("converts simple xpointer", function()
-            local cfi_resolver = GrimmoryCFIResolver:new("example.html")
+            local cfi_resolver = GrimmoryCFIResolver:new(fake_document)
 
             local actual = cfi_resolver:xpointerToCFI(
                 "/body/DocFragment[12]/body/div/p"
@@ -160,7 +151,7 @@ describe("GrimmoryCFIResolver", function()
         end)
 
         it("converts xpointer referencing second occurrence", function()
-            local cfi_resolver = GrimmoryCFIResolver:new("example.html")
+            local cfi_resolver = GrimmoryCFIResolver:new(fake_document)
 
             local actual = cfi_resolver:xpointerToCFI(
                 "/body/DocFragment[12]/body/div/p[2]"
@@ -173,7 +164,7 @@ describe("GrimmoryCFIResolver", function()
         end)
 
         it("converts xpointer referencing text", function()
-            local cfi_resolver = GrimmoryCFIResolver:new("example.html")
+            local cfi_resolver = GrimmoryCFIResolver:new(fake_document)
 
             local actual = cfi_resolver:xpointerToCFI(
                 "/body/DocFragment[12]/body/div/p/text().3"
@@ -186,7 +177,7 @@ describe("GrimmoryCFIResolver", function()
         end)
 
         it("converts xpointer mapping text offsets", function()
-            local cfi_resolver = GrimmoryCFIResolver:new("example.html")
+            local cfi_resolver = GrimmoryCFIResolver:new(fake_document)
 
             local actual = cfi_resolver:xpointerToCFI(
                 "/body/DocFragment[12]/body/div/p[2]/text().3"
@@ -199,7 +190,7 @@ describe("GrimmoryCFIResolver", function()
         end)
 
         it("converts xpointer referencing text in between elements", function()
-            local cfi_resolver = GrimmoryCFIResolver:new("example.html")
+            local cfi_resolver = GrimmoryCFIResolver:new(fake_document)
 
             local actual = cfi_resolver:xpointerToCFI(
                 "/body/DocFragment[12]/body/div/p[2]/text()[2].3"
@@ -214,7 +205,7 @@ describe("GrimmoryCFIResolver", function()
 
     describe("xpointerRangeToCFI", function()
         it("supports ranges between two block nodes", function()
-            local cfi_resolver = GrimmoryCFIResolver:new("example.html")
+            local cfi_resolver = GrimmoryCFIResolver:new(fake_document)
 
             local actual = cfi_resolver:xpointerRangeToCFI(
                 "/body/DocFragment[12]/body/div/p",
@@ -228,7 +219,7 @@ describe("GrimmoryCFIResolver", function()
         end)
 
         it("supports ranges between block and inline", function()
-            local cfi_resolver = GrimmoryCFIResolver:new("example.html")
+            local cfi_resolver = GrimmoryCFIResolver:new(fake_document)
 
             local actual = cfi_resolver:xpointerRangeToCFI(
                 "/body/DocFragment[12]/body/div/p/text()[1].2",

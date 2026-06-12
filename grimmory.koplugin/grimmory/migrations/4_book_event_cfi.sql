@@ -1,0 +1,1 @@
+ALTER TABLE book_event ADD cfi TEXT NULL;

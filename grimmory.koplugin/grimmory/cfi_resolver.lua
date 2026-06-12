@@ -1,5 +1,4 @@
 local Cache = require("cache")
-local DocumentRegistry = require("document/documentregistry")
 
 local GrimmoryLogger = require("grimmory/logger")
 
@@ -392,77 +391,9 @@ local function split_local_range_cfi_path(cfi)
     return root .. path_a, root .. path_b
 end
 
----@class GrimmoryCFIResolver
----@field document_path string
----@field document CREDocument
----@field cache Cache
-local GrimmoryCFIResolver = {}
-
----@param document_path string
-function GrimmoryCFIResolver:new(document_path, cache)
-    local o = {
-        document_path = document_path,
-        cache = cache or Cache:new({ slots = 8 })
-    }
-    setmetatable(o, self)
-    self.__index = self
-    o:init()
-    return o
-end
-
-function GrimmoryCFIResolver:init()
-end
-
----@private
----@param fragment_index integer
----@return string | nil html
-function GrimmoryCFIResolver:getFragmentHTML(fragment_index)
-    local html
-
-    html = self.cache:get(fragment_index)
-    if html ~= nil then
-        return html
-    end
-
-    local document = (
-        DocumentRegistry:hasProvider(self.document_path) and
-        DocumentRegistry:openDocument(self.document_path)
-    )
-
-    if document then
-        local loaded = true
-        if document.loadDocument then
-            loaded = document:loadDocument(true)
-        end
-
-        if loaded then
-            -- There has to be a better way to get this..
-
-            local source
-            local fragment_html = document:getHTMLFromXPointer("/body/DocFragment[" .. tostring(fragment_index) .. "]")
-            for token in tokenize_html(fragment_html) do
-                if token.type == "tag" and token.text == "docfragment" then
-                    source = token.raw:match("Source=\"([^\"]+)\"")
-                    break
-                end
-            end
-
-            if source then
-                html = document:getDocumentFileContent(source)
-            end
-
-        end
-
-        document:close()
-    end
-
-    self.cache:insert(fragment_index, html)
-
-    return html
-end
-
----@private
-function GrimmoryCFIResolver:cfiLocalPathToFragmentPath(fragment_html, cfi_local_path)
+---@param fragment_html any
+---@param cfi_local_path any
+local function cfi_local_path_to_fragment_path(fragment_html, cfi_local_path)
     local tokens = tokenize_html(fragment_html)
 
     for token in tokens do
@@ -512,11 +443,10 @@ function GrimmoryCFIResolver:cfiLocalPathToFragmentPath(fragment_html, cfi_local
     return "/" .. table.concat(fragment_path_parts, "/") .. character_offset_suffix
 end
 
----@private
 ---@param fragment_html string
 ---@param fragment_path XPointerFragmentPart[]
 ---@return string cfi_local_path
-function GrimmoryCFIResolver:fragmentPathToCFILocalPath(fragment_html, fragment_path)
+local function fragment_path_to_cfi_local_path(fragment_html, fragment_path)
     if #fragment_path == 0 or #fragment_html == 0 then
         return "/1"
     end
@@ -576,24 +506,78 @@ function GrimmoryCFIResolver:fragmentPathToCFILocalPath(fragment_html, fragment_
     return "/" .. table.concat(cfi_steps, "/") .. character_offset_suffix
 end
 
----@private
+---@class GrimmoryCFIResolver
+---@field document string
+---@field cache Cache
+local GrimmoryCFIResolver = {}
+
+---@param document CREDocument
+---@param cache? Cache
+function GrimmoryCFIResolver:new(document, cache)
+    local o = {
+        document = document,
+        cache = cache or Cache:new({ slots = 8 })
+    }
+    setmetatable(o, self)
+    self.__index = self
+    o:init()
+    return o
+end
+
+function GrimmoryCFIResolver:init()
+end
+
 ---@param cfi_a string
 ---@param cfi_b string
----@return string local_range_path
-function GrimmoryCFIResolver:getLocalRangeCFIPath(cfi_a, cfi_b)
+---@return string
+function GrimmoryCFIResolver.asCFIRange(cfi_a, cfi_b)
+    local bare_cfi_a = cfi_a:match("^epubcfi%((.+)%)$")
+    local bare_cfi_b = cfi_b:match("^epubcfi%((.+)%)$")
+
     local root = ""
 
-    for step in cfi_a:gmatch("([^/]+)") do
+    for step in bare_cfi_a:gmatch("([^/]+)") do
         local next = root .. "/" .. step .. "/"
 
-        if next ~= cfi_b:sub(1, #next) then
+        if next ~= bare_cfi_b:sub(1, #next) then
             break
         end
 
         root = root .. "/" .. step
     end
 
-    return root .. "," .. cfi_a:sub(#root + 1) .. "," .. cfi_b:sub(#root + 1)
+    return "epubcfi(" .. root .. "," .. bare_cfi_a:sub(#root + 1) .. "," .. bare_cfi_b:sub(#root + 1) .. ")"
+end
+
+---@private
+---@param fragment_index integer
+---@return string | nil html
+function GrimmoryCFIResolver:getFragmentHTML(fragment_index)
+    local html
+
+    html = self.cache:get(fragment_index)
+    if html ~= nil then
+        return html
+    end
+
+    -- There has to be a better way to get this..
+
+    local source
+    local fragment_html = self.document:getHTMLFromXPointer("/body/DocFragment[" .. tostring(fragment_index) .. "]")
+    for token in tokenize_html(fragment_html) do
+        if token.type == "tag" and token.text == "docfragment" then
+            source = token.raw:match("Source=\"([^\"]+)\"")
+            break
+        end
+    end
+
+    if source then
+        html = self.document:getDocumentFileContent(source)
+    end
+
+    self.cache:insert(fragment_index, html)
+
+    return html
 end
 
 ---@param cfi string
@@ -625,7 +609,7 @@ function GrimmoryCFIResolver:cfiToXpointer(cfi)
         error("Unable to load fragment HTML for CFI")
     end
 
-    local fragment_path = self:cfiLocalPathToFragmentPath(fragment_html, local_path)
+    local fragment_path = cfi_local_path_to_fragment_path(fragment_html, local_path)
 
     return "/body/DocFragment[" .. tostring(fragment_index) .. "]" .. fragment_path
 end
@@ -656,7 +640,7 @@ function GrimmoryCFIResolver:xpointerToCFI(xpointer)
     end
 
     -- DOM to CFI steps
-    local local_path = self:fragmentPathToCFILocalPath(fragment_html, fragment_path)
+    local local_path = fragment_path_to_cfi_local_path(fragment_html, fragment_path)
 
     logger:dbg("Local path for CFI:", local_path)
 
@@ -668,32 +652,10 @@ end
 ---@param xpointer_end string
 ---@return string cfi
 function GrimmoryCFIResolver:xpointerRangeToCFI(xpointer_start, xpointer_end)
-    -- Decompose XPointer to parts
-    local fragment_start_index, fragment_start_path = decompose_xpointer(xpointer_start)
-    local fragment_end_index, fragment_end_path = decompose_xpointer(xpointer_end)
+    local cfi_start = self:xpointerToCFI(xpointer_start)
+    local cfi_end = self:xpointerToCFI(xpointer_end)
 
-    if fragment_start_index ~= fragment_end_index then
-        logger:err("Unable to convert xpointer range between fragments")
-        error("Unable to handle xpointers between fragments")
-    end
-
-    -- Read HTML for fragment index
-    local fragment_html = self:getFragmentHTML(fragment_start_index)
-
-    if fragment_html == nil then
-        logger:err("Unable to load fragment HTML for XPointer range:", xpointer_start, xpointer_end)
-        error("Unable to load fragment HTML for XPointer")
-    end
-
-    -- DOM to CFI steps
-    local local_start_path = self:fragmentPathToCFILocalPath(fragment_html, fragment_start_path)
-    local local_end_path = self:fragmentPathToCFILocalPath(fragment_html, fragment_end_path)
-
-    -- Get parts that are the same
-    local local_range_path = self:getLocalRangeCFIPath(local_start_path, local_end_path)
-
-    -- Format
-    return format_cfi(fragment_start_index, local_range_path)
+    return self.asCFIRange(cfi_start, cfi_end)
 end
 
 return GrimmoryCFIResolver

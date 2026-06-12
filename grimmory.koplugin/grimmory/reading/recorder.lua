@@ -1,3 +1,4 @@
+local GrimmoryCFIResolver = require("grimmory/cfi_resolver")
 local GrimmoryLogger = require("grimmory/logger")
 
 local logger = GrimmoryLogger:new()
@@ -62,6 +63,29 @@ function ReadingRecorder:getOpenBookXPointer()
     return self.ui.rolling:getLastProgress()
 end
 
+function ReadingRecorder:getOpenBookCFI()
+    if not self.ui or not self.ui.document or self.ui.document.info.has_pages then
+        return nil
+    end
+
+    local xpointer = self.ui.rolling:getLastProgress()
+
+    if xpointer == nil then
+        return nil
+    end
+
+    local cfi_resolver = GrimmoryCFIResolver:new(self.ui.document)
+
+    local ok, cfi = pcall(cfi_resolver.xpointerToCFI, cfi_resolver, xpointer)
+
+    if not ok then
+        logger:err("Could not convert xpointer:", cfi)
+        return nil
+    end
+
+    return cfi
+end
+
 ---@return string | nil book_path current book path
 function ReadingRecorder:getOpenBookPath()
     if not self.ui or not self.ui.document then
@@ -77,8 +101,9 @@ function ReadingRecorder:emitSessionEvent(session_id, event_type)
     local current_page = self:getOpenBookCurrentPage()
     local total_pages = self:getOpenBookTotalPages()
     local xpointer = self:getOpenBookXPointer()
+    local cfi = self:getOpenBookCFI()
 
-    self.repository:insertBookEvent(session_id, event_type, current_page, total_pages, xpointer)
+    self.repository:insertBookEvent(session_id, event_type, current_page, total_pages, xpointer, cfi)
 end
 
 function ReadingRecorder:onSessionStart()
