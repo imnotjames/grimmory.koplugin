@@ -24,7 +24,7 @@ local HTML_VOID_ELEMENT_TAGS = {
 local function find_first(s, patterns, index)
     local res = {}
     for _, p in ipairs(patterns) do
-        local match = { s:find(p, index) }
+        local match = { s:find(p, index, true) }
         if #match > 0 and (#res == 0 or match[1] < res[1]) then
             res = match
         end
@@ -40,7 +40,7 @@ local function tokenize_html(html)
 
     return function ()
         while html ~= nil and pos < #html do
-            local start = find_first(html, {"<!%-%-", "<[-A-Z0-9a-z/!$]", "<%?"}, pos)
+            local start = find_first(html, {"<!--", "<?", "<"}, pos)
             if not start then
                 local text = html:sub(pos)
                 pos = #html
@@ -68,11 +68,11 @@ local function tokenize_html(html)
 
             local is_ignored = false
 
-            if html:match("^<!%-%-", start) then
-                _,stop = html:find("%-%->", start)
+            if html:sub(start, start + 3) == "<!--" then
+                _,stop = html:find("-->", start, true)
                 is_ignored = true
-            elseif html:match("^<%?", start) then
-                _,stop = html:find("?>", start)
+            elseif html:sub(start, start + 1) == "<?" then
+                _,stop = html:find("?>", start, true)
                 is_ignored = true
             else
                 _,stop = html:find("%b<>", start)
