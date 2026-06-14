@@ -182,6 +182,7 @@ function ReadingRecorder:onSessionEnd()
     self.last_page = nil
     self.session_id = nil
     self.session_book_path = nil
+    self.cfi_resolver = nil
 end
 
 return ReadingRecorder
