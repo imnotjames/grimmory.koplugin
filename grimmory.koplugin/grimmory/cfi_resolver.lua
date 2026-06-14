@@ -4,6 +4,10 @@ local GrimmoryLogger = require("grimmory/logger")
 
 local logger = GrimmoryLogger:new()
 
+-- The default number of tokens we will bail after
+-- to prevent runaway and performance degradation.
+local DEFAULT_TOKEN_LIMIT = 2500
+
 local HTML_VOID_ELEMENT_TAGS = {
     area=true,
     base=true,
@@ -35,11 +39,21 @@ end
 
 ---@param html string
 ---@return function token_iterator
-local function tokenize_html(html)
+local function tokenize_html(html, token_limit)
+    if token_limit == nil then
+        token_limit = DEFAULT_TOKEN_LIMIT
+    end
+
     local pos = 0
 
     return function ()
         while html ~= nil and pos < #html do
+            token_limit = token_limit - 1
+
+            if token_limit <= 0 then
+                error("Too many tokens")
+            end
+
             local start = find_first(html, {"<!--", "<?", "<"}, pos)
             if not start then
                 local text = html:sub(pos)
