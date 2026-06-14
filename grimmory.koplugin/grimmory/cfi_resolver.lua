@@ -4,6 +4,10 @@ local GrimmoryLogger = require("grimmory/logger")
 
 local logger = GrimmoryLogger:new()
 
+-- The default number of tokens we will bail after
+-- to prevent runaway and performance degradation.
+local DEFAULT_TOKEN_LIMIT = 2500
+
 local HTML_VOID_ELEMENT_TAGS = {
     area=true,
     base=true,
@@ -24,7 +28,7 @@ local HTML_VOID_ELEMENT_TAGS = {
 local function find_first(s, patterns, index)
     local res = {}
     for _, p in ipairs(patterns) do
-        local match = { s:find(p, index) }
+        local match = { s:find(p, index, true) }
         if #match > 0 and (#res == 0 or match[1] < res[1]) then
             res = match
         end
@@ -35,12 +39,22 @@ end
 
 ---@param html string
 ---@return function token_iterator
-local function tokenize_html(html)
+local function tokenize_html(html, token_limit)
+    if token_limit == nil then
+        token_limit = DEFAULT_TOKEN_LIMIT
+    end
+
     local pos = 0
 
     return function ()
         while html ~= nil and pos < #html do
-            local start = find_first(html, {"<!%-%-", "<[-A-Z0-9a-z/!$]", "<%?"}, pos)
+            token_limit = token_limit - 1
+
+            if token_limit <= 0 then
+                error("Too many tokens")
+            end
+
+            local start = find_first(html, {"<!--", "<?", "<"}, pos)
             if not start then
                 local text = html:sub(pos)
                 pos = #html
@@ -68,11 +82,11 @@ local function tokenize_html(html)
 
             local is_ignored = false
 
-            if html:match("^<!%-%-", start) then
-                _,stop = html:find("%-%->", start)
+            if html:sub(start, start + 3) == "<!--" then
+                _,stop = html:find("-->", start, true)
                 is_ignored = true
-            elseif html:match("^<%?", start) then
-                _,stop = html:find("?>", start)
+            elseif html:sub(start, start + 1) == "<?" then
+                _,stop = html:find("?>", start, true)
                 is_ignored = true
             else
                 _,stop = html:find("%b<>", start)
@@ -94,7 +108,7 @@ local function tokenize_html(html)
                 pos = stop + 1
 
                 local found_tag = html:sub(start, stop)
-                local found_end_tag, found_tag_name = found_tag:match("^<(/?)([^%s>]+)")
+                local found_end_tag, found_tag_name = found_tag:match("^<(/?)([^/%s>]+)")
 
                 if found_tag_name then
                     if found_end_tag == "/" then
@@ -118,7 +132,7 @@ local function walk_tree(tokens, callback)
 
     -- Search among the siblings
     for token in tokens do
-        if not callback(depth, token) then
+        if depth == 0 and not callback(depth, token) then
             return true
         end
 
@@ -627,6 +641,15 @@ end
 ---@return string cfi
 function GrimmoryCFIResolver:xpointerToCFI(xpointer)
     logger:dbg("Converting xpointer to CFI:", xpointer)
+
+    local normalized_xpointer = self.document:getNormalizedXPointer(xpointer)
+
+    if not normalized_xpointer then
+        logger:err("XPointer not in document:", xpointer)
+        error("XPointer not in document")
+    end
+
+    xpointer = normalized_xpointer
 
     -- Decompose XPointer to parts
     local fragment_index, fragment_path = decompose_xpointer(xpointer)

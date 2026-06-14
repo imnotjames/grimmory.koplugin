@@ -9,6 +9,7 @@ local logger = GrimmoryLogger:new()
 ---@field last_page integer | nil
 ---@field session_book_path string | nil
 ---@field session_id integer | nil
+---@field cfi_resolver GrimmoryCFIResolver | nil
 local ReadingRecorder = {}
 
 function ReadingRecorder:new(o)
@@ -74,9 +75,11 @@ function ReadingRecorder:getOpenBookCFI()
         return nil
     end
 
-    local cfi_resolver = GrimmoryCFIResolver:new(self.ui.document)
+    if self.cfi_resolver == nil or self.cfi_resolver.document ~= self.ui.document then
+        self.cfi_resolver = GrimmoryCFIResolver:new(self.ui.document)
+    end
 
-    local ok, cfi = pcall(cfi_resolver.xpointerToCFI, cfi_resolver, xpointer)
+    local ok, cfi = pcall(self.cfi_resolver.xpointerToCFI, self.cfi_resolver, xpointer)
 
     if not ok then
         logger:err("Could not convert xpointer:", cfi)
@@ -179,6 +182,7 @@ function ReadingRecorder:onSessionEnd()
     self.last_page = nil
     self.session_id = nil
     self.session_book_path = nil
+    self.cfi_resolver = nil
 end
 
 return ReadingRecorder
