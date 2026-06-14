@@ -94,7 +94,7 @@ local function tokenize_html(html)
                 pos = stop + 1
 
                 local found_tag = html:sub(start, stop)
-                local found_end_tag, found_tag_name = found_tag:match("^<(/?)([^%s>]+)")
+                local found_end_tag, found_tag_name = found_tag:match("^<(/?)([^/%s>]+)")
 
                 if found_tag_name then
                     if found_end_tag == "/" then
