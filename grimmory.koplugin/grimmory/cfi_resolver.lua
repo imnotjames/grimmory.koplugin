@@ -642,12 +642,14 @@ end
 function GrimmoryCFIResolver:xpointerToCFI(xpointer)
     logger:dbg("Converting xpointer to CFI:", xpointer)
 
-    xpointer = self.document:getNormalizedXPointer(xpointer)
+    local normalized_xpointer = self.document:getNormalizedXPointer(xpointer)
 
-    if not xpointer then
+    if not normalized_xpointer then
         logger:err("XPointer not in document:", xpointer)
         error("XPointer not in document")
     end
+
+    xpointer = normalized_xpointer
 
     -- Decompose XPointer to parts
     local fragment_index, fragment_path = decompose_xpointer(xpointer)
