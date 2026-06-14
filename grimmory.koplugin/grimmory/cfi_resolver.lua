@@ -118,7 +118,7 @@ local function walk_tree(tokens, callback)
 
     -- Search among the siblings
     for token in tokens do
-        if not callback(depth, token) then
+        if depth == 0 and not callback(depth, token) then
             return true
         end
 
