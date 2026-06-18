@@ -494,7 +494,7 @@ function GrimmoryLocalRepository:getPendingSessionEvents(book_id)
                     e.cfi
                 FROM book AS b
                 LEFT JOIN book_sync_status AS bss
-                    ON bss.book_id = b.id AND bss.sync_type = "sessions"
+                    ON bss.book_id = b.id AND bss.sync_type = 'sessions'
                 JOIN book_session AS s ON s.book_id = b.id
                 JOIN book_event AS e ON e.session_id = s.id
                 WHERE
@@ -697,9 +697,9 @@ function GrimmoryLocalRepository:getBooksPendingSync(
                 JOIN book_session ON book.id = book_session.book_id
                 JOIN book_event ON book_session.id = book_event.session_id
                 LEFT JOIN book_sync_status AS sync_sessions
-                    ON book.id = sync_sessions.book_id AND sync_sessions.sync_type = "sessions"
+                    ON book.id = sync_sessions.book_id AND sync_sessions.sync_type = 'sessions'
                 LEFT JOIN book_sync_status AS sync_progress
-                    ON book.id = sync_progress.book_id AND sync_progress.sync_type = "progress"
+                    ON book.id = sync_progress.book_id AND sync_progress.sync_type = 'progress'
                 WHERE
                     grimmory_id IS NOT NULL
                     AND
