@@ -96,6 +96,17 @@ end
 ---@field metadata BookMetadata
 ---@field primary_file BookFile | nil
 
+---@class GrimmoryAnnotation
+---@field id number | nil
+---@field book_id number
+---@field created_at number
+---@field updated_at number | nil
+---@field cfi string
+---@field text string
+---@field chapter string
+---@field color string
+---@field style string
+
 local function parse_book(book)
     local shelves = {}
 
@@ -720,6 +731,129 @@ function GrimmoryAPI:getReadingProgress(username, auth_key, book_md5)
     }
 
     return ok, progress
+end
+
+---@param book_id number
+---@return boolean ok
+---@return GrimmoryAnnotation[] annotations
+function GrimmoryAPI:getAnnotations(book_id)
+    local ok, _, body = self:request(
+        "GET",
+        "/api/v1/annotations/book/" .. tostring(book_id)
+    )
+
+    if not ok or not body or type(body) == "string" then
+        logger:err("Unable to read annotations for book:", book_id, "-", body)
+        return false, {}
+    end
+
+    local annotations = {}
+
+    for _, raw_annotation in ipairs(body) do
+        ---@type GrimmoryAnnotation
+        local annotation = {
+            id = tonumber(raw_annotation.id) or 0,
+            book_id = tonumber(raw_annotation.bookId) or 0,
+            created_at = fromISO8601(raw_annotation.createdAt),
+            cfi = tostring(raw_annotation.cfi),
+            text = tostring(raw_annotation.text),
+            chapter = tostring(raw_annotation.chapterTitle),
+            color = tostring(raw_annotation.color),
+            style = tostring(raw_annotation.style),
+        }
+
+        table.insert(annotations, annotation)
+    end
+
+    return ok, annotations
+end
+
+---@param book_id number
+---@param cfi string
+---@param chapter_title string
+---@param text string
+---@param color string
+---@param style string
+---@param note string | nil
+function GrimmoryAPI:createAnnotation(
+    book_id,
+    cfi,
+    chapter_title,
+    text,
+    color,
+    style,
+    note
+)
+    local request = {
+        bookId = book_id,
+        cfi = cfi,
+        chapterTitle = chapter_title,
+        text = text,
+        color = color,
+        style = style,
+        note = note,
+    }
+
+    local ok, _, body = self:request(
+        "POST",
+        "/api/v1/annotations",
+        request
+    )
+
+    if not ok then
+        logger:err("Unable to push annotation", body)
+        return false, nil
+    end
+
+    return ok, body
+end
+
+---@param annotation_id number
+function GrimmoryAPI:deleteAnnotation(
+    annotation_id
+)
+    local ok, code, body = self:request(
+        "DELETE",
+        "/api/v1/annotations/" .. annotation_id
+    )
+
+    if not ok and code ~= 404 then
+        logger:err("Unable to delete annotation", body)
+        return false
+    end
+
+    return true
+
+end
+
+---@param annotation_id number
+---@param color string
+---@param style string
+---@param note string | nil
+function GrimmoryAPI:updateAnnotation(
+    annotation_id,
+    color,
+    style,
+    note
+)
+    local request = {
+        color = color,
+        style = style,
+        note = note,
+    }
+
+    local ok, _, body = self:request(
+        "PUT",
+        "/api/v1/annotations/" .. annotation_id,
+        request
+    )
+
+    if not ok then
+        logger:err("Unable to update annotation", body)
+        return false
+    end
+
+    return ok
 end
 
 return GrimmoryAPI
