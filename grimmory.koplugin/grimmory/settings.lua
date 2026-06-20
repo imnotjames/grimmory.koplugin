@@ -270,7 +270,7 @@ function GrimmorySettings:getSyncReadingSessions()
 end
 
 function GrimmorySettings:toggleSyncReadingSessions()
-    self.data.sync_reading_sessions = not self.data.sync_reading_sessions
+    self.data.sync_reading_sessions = not self:getSyncReadingSessions()
     self:write()
 end
 
