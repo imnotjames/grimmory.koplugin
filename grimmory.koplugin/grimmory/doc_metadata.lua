@@ -217,4 +217,73 @@ function DocMetadata:setProgress(path, percent, xpointer, page)
     settings:flush()
 end
 
+function DocMetadata:getAnnotations(path)
+    local settings = self:getDocSettings(path)
+
+    return settings:readSetting("annotations") or {}
+end
+
+function DocMetadata:setAnnotations(path, annotations)
+    local settings = self:getDocSettings(path)
+
+    settings:saveSetting("annotations_externally_modified", true)
+    settings:saveSetting("annotations", annotations)
+
+    settings:flush()
+end
+
+---@param book_path string
+---@return integer[]
+function DocMetadata:getModifiedGrimmoryAnnotations(path)
+    local settings = self:getDocSettings(path)
+
+    return settings:readSetting("modified_grimmory_annotations") or {}
+end
+
+---@param book_path string
+---@param grimmory_id integer
+function DocMetadata:removeModifiedGrimmoryAnnotation(path, grimmory_id)
+    local settings = self:getDocSettings(path)
+    local existing_grimmory_ids = settings:readSetting("modified_grimmory_annotations") or {}
+
+    local new_grimmory_ids = {}
+    for _, v in ipairs(existing_grimmory_ids) do
+        if v ~= grimmory_id then
+            table.insert(new_grimmory_ids, v)
+        end
+    end
+
+    if #new_grimmory_ids == #existing_grimmory_ids then
+        -- No change, skip save
+        return
+    end
+
+    if #new_grimmory_ids == 0 then
+        settings:delSetting("modified_grimmory_annotations")
+    else
+        settings:saveSetting("modified_grimmory_annotations", new_grimmory_ids)
+    end
+
+    settings:flush()
+end
+
+---@param book_path string
+---@param grimmory_id integer
+function DocMetadata:appendModifiedGrimmoryAnnotation(path, grimmory_id)
+    local settings = self:getDocSettings(path)
+    local grimmory_ids = settings:readSetting("modified_grimmory_annotations") or {}
+
+    for _, v in ipairs(grimmory_ids) do
+        if v == grimmory_id then
+            -- Already exists, skip everything else.
+            return
+        end
+    end
+
+    table.insert(grimmory_ids, grimmory_id)
+
+    settings:saveSetting("modified_grimmory_annotations", grimmory_ids)
+    settings:flush()
+end
+
 return DocMetadata
