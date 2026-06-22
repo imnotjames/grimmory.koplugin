@@ -12,11 +12,7 @@ local logger = GrimmoryLogger:new()
 ---@field settings GrimmorySettings
 ---@field api GrimmoryAPI
 ---@field doc_metadata GrimmoryDocMetadata
----@field cached_books Book[]
-local GrimmorySynchronize = {
-    synchronize_sessions_since = 0,
-    cached_books = {},
-}
+local GrimmorySynchronize = {}
 
 function GrimmorySynchronize:new(o)
     o = o or {}
