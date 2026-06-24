@@ -380,21 +380,10 @@ end
 
 function DialogManager:showProgressDialog(title, dismiss_callback, dismiss_text)
     local dialog
-    local is_closing = false
+    local is_external_closing = false
 
     if dismiss_text == nil then
         dismiss_text = _("Terminate this task?")
-    end
-
-    local close_callback = function()
-        -- Track this because `dialog:close()` will call this function
-        if is_closing then
-            return
-        end
-
-        is_closing = true
-        pcall(dismiss_callback)
-        dialog:close()
     end
 
     dialog = ProgressbarDialog:new({
@@ -403,10 +392,21 @@ function DialogManager:showProgressDialog(title, dismiss_callback, dismiss_text)
         refresh_time_seconds = 3,
         dismiss_text = dismiss_text,
         dismissable = dismiss_callback ~= nil,
-        dismiss_callback = close_callback,
+        dismiss_callback = function ()
+            if not is_external_closing then
+                -- Only call the dismiss callback if we are closing
+                -- from the progress bar dialog itself.
+                pcall(dismiss_callback)
+            end
+        end
     })
 
     dialog:show()
+
+    local close_callback = function()
+        is_external_closing = true
+        dialog:close()
+    end
 
     local function update_callback(progress, total_progress)
         dialog.progress_max = total_progress
