@@ -252,6 +252,19 @@ describe("GrimmoryCFIResolver", function()
         end)
     end)
 
+    describe("cfiRangeToXPointers", function()
+        it("handles start and end within text blocks", function()
+            local cfi_resolver = GrimmoryCFIResolver:new(fake_document)
+
+            local actual_start, actual_end = cfi_resolver:cfiRangeToXPointers(
+                "epubcfi(/6/24!/4/2/6,/3:3,/3:5)"
+            )
+
+            assert.are.equal("/body/DocFragment[12]/body/div/p[2]/text()[2].3", actual_start)
+            assert.are.equal("/body/DocFragment[12]/body/div/p[2]/text()[2].5", actual_end)
+        end)
+    end)
+
     describe("xpointerRangeToCFI", function()
         it("supports ranges between two block nodes", function()
             local cfi_resolver = GrimmoryCFIResolver:new(fake_document)

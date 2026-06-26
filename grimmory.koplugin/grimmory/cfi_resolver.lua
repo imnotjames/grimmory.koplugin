@@ -409,13 +409,13 @@ end
 ---@return string cfi_start
 ---@return string cfi_end
 local function split_local_range_cfi_path(cfi)
-    local root, path_a, path_b = cfi:match("^([^,]+),([^,]+),([^,]+)$")
+    local root, path_a, path_b = cfi:match("epubcfi%(([^,%)]+),([^,%)]+),([^,%)]+)%)$")
 
     if root == nil or path_a == nil or path_b == nil then
         error("invalid CFI range")
     end
 
-    return root .. path_a, root .. path_b
+    return "epubcfi(" .. root .. path_a .. ")", "epubcfi(" .. root .. path_b .. ")"
 end
 
 ---@param fragment_html any
