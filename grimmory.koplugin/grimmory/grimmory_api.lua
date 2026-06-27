@@ -10,8 +10,62 @@ local GrimmoryLogger = require("grimmory/logger")
 local logger = GrimmoryLogger:new()
 
 
+
+local function from_json_nullable(value)
+    if type(value) == "function" then
+        -- Handle JSON encoded null wonk.  Since the
+        -- LUA `nil` cannot be stored in a table,
+        -- the JSON encoder will use a special `null`
+        -- function instead.
+        value = value()
+    end
+
+
+    return value
+end
+
+---@param value any
+---@param converter function
+local function from_json_value(value, converter, default_value)
+    value = from_json_nullable(value)
+
+    if value == nil then
+        return default_value
+    end
+
+    return converter(value)
+end
+
+local function from_json_string(value, default_value)
+    return from_json_value(value, tostring, default_value)
+end
+
+local function from_json_number(value, default_value)
+    return from_json_value(value, tonumber, default_value)
+end
+
+local function from_json_bool(value, default_value)
+        if type(value) == "function" then
+        -- Handle JSON encoded null wonk.  Since the
+        -- LUA `nil` cannot be stored in a table,
+        -- the JSON encoder will use a special `null`
+        -- function instead.
+        value = value()
+    end
+
+    if value == nil then
+        return default_value == true
+    end
+
+    return value == true
+end
+
 ---@param timestamp number
-local function toISO8601(timestamp)
+local function to_iso8601(timestamp)
+    if timestamp == nil then
+        return nil
+    end
+
     local parsed = os.date("!*t", timestamp)
     return string.format(
         "%04d-%02d-%02dT%02d:%02d:%02dZ",
@@ -25,7 +79,7 @@ local function toISO8601(timestamp)
 end
 
 ---@param value string
-local function fromISO8601(value)
+local function from_iso8601(value)
     local year, month, day, hour, min, sec = value:match(
         "(%d+)-(%d+)-(%d+)T(%d+):(%d+):(%d+)"
     )
@@ -40,12 +94,21 @@ local function fromISO8601(value)
     })
 end
 
+local function from_json_iso8601(value)
+    value = from_json_string(value)
+
+    if value == nil then
+        return nil
+    end
+
+    return from_iso8601(value)
+end
+
 ---@class BookMetadata
 ---@field isbn13 string | nil
 ---@field isbn10 string | nil
 ---@field asin string | nil
 ---@field title string | nil
----@field authors string[] | nil
 
 ---@class BookFile
 ---@field filename string
@@ -57,35 +120,38 @@ end
 ---@field metadata BookMetadata
 ---@field primary_file BookFile | nil
 
-local function parseBook(book)
+local function parse_book(book)
     local shelves = {}
 
-    if book["shelves"] then
-        for _, shelf in ipairs(book["shelves"]) do
-            table.insert(shelves, shelf.id)
+    local book_shelves = from_json_nullable(book["shelves"])
+    if book_shelves then
+        for _, shelf in ipairs(book_shelves) do
+            table.insert(shelves, from_json_number(shelf.id))
         end
     end
 
+    local book_metadata = from_json_nullable(book["metadata"]) or {}
     ---@type BookMetadata
     local metadata = {
-        isbn10 = book["metadata"]["isbn10"],
-        isbn13 = book["metadata"]["isbn13"],
-        asin = book["metadata"]["asin"],
-        title = book["metadata"]["title"],
-        authors = book["metadata"]["authors"],
+        isbn10 = from_json_string(book_metadata["isbn10"]),
+        isbn13 = from_json_string(book_metadata["isbn13"]),
+        asin = from_json_string(book_metadata["asin"]),
+        title = from_json_string(book_metadata["title"]),
     }
 
     local primary_file = nil
 
-    if book["primaryFile"] and book["primaryFile"]["fileName"] then
+    local book_primary_file = from_json_nullable(book["primaryFile"])
+
+    if book_primary_file ~= nil then
         primary_file = {
-            filename = book["primaryFile"]["fileName"]
+            filename = from_json_string(book_primary_file["fileName"])
         }
     end
 
     return {
-        id = book.id,
-        added_on = fromISO8601(book["addedOn"]),
+        id = from_json_number(book.id),
+        added_on = from_json_iso8601(book["addedOn"]),
         shelves = shelves,
         metadata = metadata,
         primary_file = primary_file
@@ -135,7 +201,11 @@ function GrimmoryAPI:refreshToken(refresh_token)
         return false, nil, nil, 0
     end
 
-    return ok, body["accessToken"], body["refreshToken"], tonumber(body["expires"])
+    local access_token = from_json_string(body["accessToken"])
+    local new_refresh_token = from_json_string(body["refreshToken"])
+    local expires = from_json_number(body["expires"])
+
+    return ok, access_token, new_refresh_token, expires
 end
 
 ---@param base_uri string
@@ -165,8 +235,11 @@ function GrimmoryAPI:getToken(base_uri, username, password)
         end
     end
 
-    local expiry = tonumber(body["expires"]) or 0
-    return ok, body["accessToken"], body["refreshToken"], expiry
+    local access_token = from_json_string(body["accessToken"])
+    local refresh_token = from_json_string(body["refreshToken"])
+    local expires = from_json_number(body["expires"])
+
+    return ok, access_token, refresh_token, expires
 end
 
 
@@ -334,7 +407,7 @@ function GrimmoryAPI:testConnection(base_uri, username, password)
         return false, body
     end
 
-    return ok, body["current"]
+    return ok, from_json_string(body["current"])
 end
 
 ---@return boolean ok
@@ -353,7 +426,7 @@ function GrimmoryAPI:getServerVersion()
         end
     end
 
-    return ok, tostring(body["current"])
+    return ok, from_json_string(body["current"])
 end
 
 ---@return boolean ok
@@ -374,7 +447,7 @@ function GrimmoryAPI:getBooksPage(page_number)
 
     if type(body.content) == "table" then
         for _, raw_book in ipairs(body.content) do
-            table.insert(books, parseBook(raw_book))
+            table.insert(books, parse_book(raw_book))
         end
     end
 
@@ -470,7 +543,17 @@ function GrimmoryAPI:getShelves()
         return false, body
     end
 
-    return ok, body
+    local shelves = {}
+    for _, body_shelf in ipairs(body) do
+        local shelf = {
+            id = from_json_number(body_shelf.id),
+            name = from_json_string(body_shelf.name),
+        }
+
+        table.insert(shelves, shelf)
+    end
+
+    return ok, shelves
 end
 
 ---@param book_id number
@@ -497,8 +580,8 @@ function GrimmoryAPI:recordSession(
     local request = {
         bookId = book_id,
         bookType = book_type,
-        startTime = toISO8601(start_time),
-        endTime = toISO8601(end_time),
+        startTime = to_iso8601(start_time),
+        endTime = to_iso8601(end_time),
         durationSeconds = duration_seconds,
         durationFormatted = nil,
         startProgress = start_progress,
@@ -532,7 +615,7 @@ function GrimmoryAPI:getKoreaderSync()
         return false, nil
     end
 
-    return true, body["syncEnabled"]
+    return true, from_json_bool(body["syncEnabled"])
 end
 
 ---@param enabled boolean
@@ -564,7 +647,7 @@ function GrimmoryAPI:getKoreaderCredentials()
         return false, nil, nil
     end
 
-    return true, body["username"], body["password"]
+    return true, from_json_string(body["username"]), from_json_string(body["password"])
 end
 
 function GrimmoryAPI:setKoreaderCredentials(auth_key, auth_secret)
@@ -651,8 +734,16 @@ function GrimmoryAPI:getReadingProgress(username, auth_key, book_md5)
         return false, nil
     end
 
-    return ok, body
+    local progress = {
+        timestamp = from_json_number(body.timestamp),
+        document = from_json_string(body.document),
+        percentage = from_json_number(body.percentage),
+        progress = from_json_string(body.progress),
+        device = from_json_string(body.device),
+        device_id = from_json_string(body.device_id),
+    }
 
+    return ok, progress
 end
 
 return GrimmoryAPI
