@@ -246,7 +246,7 @@ function GrimmoryLocalRepository:updateBook(book_id, partial_md5)
 
             stmt:bind(partial_md5, book_id)
 
-            stmt:exec()
+            stmt:step()
             stmt:close()
         end,
         "rw"
