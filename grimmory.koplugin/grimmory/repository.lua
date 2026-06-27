@@ -8,7 +8,7 @@ local logger = GrimmoryLogger:new()
 
 local SESSION_COLLAPSE_THRESHOLD = 180.0
 
-local function getPluginPath()
+local function get_plugin_path()
     local source = debug.getinfo(1, "S").source
     local path = source:match("@(.*)/")
     if not path or not path:match("%.koplugin$") then
@@ -16,6 +16,30 @@ local function getPluginPath()
     end
 
     return path
+end
+
+---@generic T
+---@param database_path string
+---@param callback (fun(database: any) | fun(database: any): `T`)
+---@param flags? "ro" | "rw" | "rwc"
+---@return boolean ok
+---@return T result
+local function with_database(database_path, callback, flags)
+    if flags == nil then
+        flags = "ro"
+    end
+
+    local database = SQ3.open(
+        database_path,
+        flags
+    )
+    database:set_busy_timeout(1000)
+
+    local ok, result = pcall(callback, database)
+
+    database:close()
+
+    return ok, result
 end
 
 ---@class GrimmoryLocalBook
@@ -74,7 +98,7 @@ end
 ---@field migrations_path string
 ---@field database_path string
 local GrimmoryLocalRepository = {
-    migrations_path = getPluginPath() .. "/grimmory/migrations/",
+    migrations_path = get_plugin_path() .. "/grimmory/migrations/",
     database_path =  DataStorage:getSettingsDir() .. "/grimmory.sqlite3",
 }
 
@@ -113,7 +137,8 @@ function GrimmoryLocalRepository:runMigrations()
         logger:dbg("Running SQL file path:", sql_filepath)
 
         if sql ~= nil then
-            self:withDatabase(
+            with_database(
+                self.database_path,
                 function(database)
                     database:exec(sql)
                 end,
@@ -127,29 +152,6 @@ function GrimmoryLocalRepository:init()
     self:runMigrations()
 end
 
----@generic T
----@param callback (fun(database: any) | fun(database: any): `T`)
----@param flags? "ro" | "rw" | "rwc"
----@return boolean ok
----@return T result
-function GrimmoryLocalRepository:withDatabase(callback, flags)
-    if flags == nil then
-        flags = "ro"
-    end
-
-    local database = SQ3.open(
-        self.database_path,
-        flags
-    )
-    database:set_busy_timeout(1000)
-
-    local ok, result = pcall(callback, database)
-
-    database:close()
-
-    return ok, result
-end
-
 ---@param book_path string
 ---@param grimmory_id number | nil
 ---@return boolean ok
@@ -158,7 +160,8 @@ end
 function GrimmoryLocalRepository:upsertBook(book_path, grimmory_id)
     local partial_md5 = util.partialMD5(book_path)
 
-    local ok, book = self:withDatabase(
+    local ok, book = with_database(
+        self.database_path,
         function(conn)
             -- Remember that `OR IGNORE` will ignore almost all
             -- data type or constraint failures.
@@ -233,7 +236,8 @@ end
 ---@return boolean ok
 ---@return string | nil message
 function GrimmoryLocalRepository:updateBook(book_id, partial_md5)
-    local ok, message = self:withDatabase(
+    local ok, message = with_database(
+        self.database_path,
         function(conn)
             local stmt = conn:prepare([[
                 UPDATE
@@ -266,7 +270,8 @@ end
 ---@return integer | nil book_id
 ---@return integer | nil grimmory_id
 function GrimmoryLocalRepository:findBookByFile(book_path, partial_md5)
-    local ok, book = self:withDatabase(
+    local ok, book = with_database(
+        self.database_path,
         function(conn)
             local select_stmt = conn:prepare([[
                 SELECT
@@ -311,7 +316,8 @@ end
 ---@return boolean ok
 ---@return GrimmoryLocalBook[] books
 function GrimmoryLocalRepository:findBooksByGrimmoryId(grimmory_id)
-    local ok, books = self:withDatabase(
+    local ok, books = with_database(
+        self.database_path,
         function(conn)
             local select_stmt = conn:prepare([[
                 SELECT
@@ -356,7 +362,8 @@ end
 ---@return boolean ok
 ---@return integer | nil session_id
 function GrimmoryLocalRepository:insertSession(book_id)
-    local ok, session_id = self:withDatabase(
+    local ok, session_id = with_database(
+        self.database_path,
         function(conn)
             local insert_stmt = conn:prepare([[
                 INSERT INTO book_session
@@ -392,7 +399,8 @@ end
 ---@param xpointer string | nil
 ---@param cfi string | nil
 function GrimmoryLocalRepository:insertBookEvent(session_id, event_type, current_page, page_count, xpointer, cfi)
-    local ok, result = self:withDatabase(
+    local ok, result = with_database(
+        self.database_path,
         function(conn)
             local stmt = conn:prepare([[
                 INSERT INTO book_event
@@ -435,7 +443,8 @@ end
 ---@return boolean ok
 ---@return ReadingSessionProgress | nil progress
 function GrimmoryLocalRepository:getReadingProgress(book_id, cutoff)
-    local ok, result = self:withDatabase(
+    local ok, result = with_database(
+        self.database_path,
         function(conn)
             local stmt = conn:prepare([[
                 SELECT
@@ -512,7 +521,8 @@ end
 ---@param book_id integer
 ---@return ReadingSessionEvent[]
 function GrimmoryLocalRepository:getPendingSessionEvents(book_id)
-    local ok, results = self:withDatabase(
+    local ok, results = with_database(
+        self.database_path,
         function(conn)
             local stmt = conn:prepare([[
                 SELECT
@@ -681,7 +691,8 @@ end
 ---@param sync_type RepositorySyncType
 ---@param timestamp number
 function GrimmoryLocalRepository:updateBookSyncTimestamp(book_id, sync_type, timestamp)
-    local ok, message = self:withDatabase(
+    local ok, message = with_database(
+        self.database_path,
         function(conn)
             local stmt = conn:prepare([[
                 INSERT INTO book_sync_status
@@ -720,7 +731,8 @@ end
 ---@return boolean ok
 ---@return integer timestamp
 function GrimmoryLocalRepository:getBookSyncTimestamp(book_id, sync_type)
-    local ok, timestamp = self:withDatabase(
+    local ok, timestamp = with_database(
+        self.database_path,
         function(conn)
             local stmt = conn:prepare([[
                 SELECT
@@ -759,7 +771,8 @@ function GrimmoryLocalRepository:getBooksPendingSync(
     with_sessions,
     with_progress
 )
-    local ok, book_ids = self:withDatabase(
+    local ok, book_ids = with_database(
+        self.database_path,
         function(conn)
             local stmt = conn:prepare([[
                 SELECT
