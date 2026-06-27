@@ -756,6 +756,7 @@ function GrimmoryAPI:getAnnotations(book_id)
             id = tonumber(raw_annotation.id) or 0,
             book_id = tonumber(raw_annotation.bookId) or 0,
             created_at = fromISO8601(raw_annotation.createdAt),
+            updated_at = fromISO8601(raw_annotation.updatedAt),
             cfi = tostring(raw_annotation.cfi),
             text = tostring(raw_annotation.text),
             note = tostring(raw_annotation.note),
