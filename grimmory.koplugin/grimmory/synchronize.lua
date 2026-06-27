@@ -524,7 +524,7 @@ function GrimmorySynchronize:associateWithShelves(book_path, shelves)
 end
 
 ---@param book_path string
----@return boolean found
+---@return integer | nil grimmory_id
 function GrimmorySynchronize:associateBook(book_path)
     for book in self.api:getBooks() do
         if self.doc_metadata:isBook(book_path, book) then
@@ -532,13 +532,14 @@ function GrimmorySynchronize:associateBook(book_path)
 
             if not ok then
                 logger:err("Failed to write book association:", book_path)
+                return nil
             end
 
-            return true
+            return book.id
         end
     end
 
-    return false
+    return nil
 end
 
 ---@param book_path string
@@ -867,7 +868,8 @@ function GrimmorySynchronize:synchronizeBook(book_path, refresh_book, callback)
         -- Try to find a grimmory ID for this book
         logger:info("Searching Grimmory for book:", book_path)
 
-        if self:associateBook(book_path) then
+        grimmory_id = self:associateBook(book_path)
+        if grimmory_id ~= nil then
             logger:info("Found book in Grimmory:", book_path)
         else
             logger:warn("Unable to locate book in Grimmory:", book_path)
