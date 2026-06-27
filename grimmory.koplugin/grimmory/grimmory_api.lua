@@ -753,16 +753,16 @@ function GrimmoryAPI:getAnnotations(book_id)
     for _, raw_annotation in ipairs(body) do
         ---@type GrimmoryAnnotation
         local annotation = {
-            id = tonumber(raw_annotation.id) or 0,
-            book_id = tonumber(raw_annotation.bookId) or 0,
-            created_at = fromISO8601(raw_annotation.createdAt),
-            updated_at = fromISO8601(raw_annotation.updatedAt),
-            cfi = tostring(raw_annotation.cfi),
-            text = tostring(raw_annotation.text),
-            note = tostring(raw_annotation.note),
-            chapter = tostring(raw_annotation.chapterTitle),
-            color = tostring(raw_annotation.color),
-            style = tostring(raw_annotation.style),
+            id = from_json_number(raw_annotation.id) or 0,
+            book_id = from_json_number(raw_annotation.bookId) or 0,
+            created_at = from_json_iso8601(raw_annotation.createdAt),
+            updated_at = from_json_iso8601(raw_annotation.updatedAt),
+            cfi = from_json_string(raw_annotation.cfi),
+            text = from_json_string(raw_annotation.text),
+            note = from_json_string(raw_annotation.note),
+            chapter = from_json_string(raw_annotation.chapterTitle),
+            color = from_json_string(raw_annotation.color),
+            style = from_json_string(raw_annotation.style),
         }
 
         table.insert(annotations, annotation)
