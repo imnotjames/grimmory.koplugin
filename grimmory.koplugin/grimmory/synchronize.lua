@@ -198,7 +198,8 @@ function GrimmorySynchronize:pushBookAnnotations(book_path, book_grimmory_id)
                 annotation.chapter,
                 annotation.text,
                 annotation.color,
-                annotation.style
+                annotation.style,
+                annotation.note
             )
 
             if create_ok then

@@ -190,6 +190,7 @@ local function merge_annotations(local_annotations, remote_annotations)
                     existing_annotation.chapter = annotation.chapter
                     existing_annotation.text = annotation.text
                     existing_annotation.page = annotation.page
+                    existing_annotation.note = annotation.note
                 end
             end
 
@@ -210,6 +211,7 @@ local function merge_annotations(local_annotations, remote_annotations)
             existing_annotation.chapter = annotation.chapter
             existing_annotation.text = annotation.text
             existing_annotation.page = annotation.page
+            existing_annotation.note = annotation.note
         end
     end
 
@@ -245,6 +247,7 @@ function GrimmoryReadingAnnotations:applyAnnotations(book_path, grimmory_annotat
 
                     chapter = annotation.chapter,
                     text = annotation.text,
+                    note = annotation.note,
 
                     page = xpointer_start,
 

@@ -103,6 +103,7 @@ end
 ---@field updated_at number | nil
 ---@field cfi string
 ---@field text string
+---@field note string | nil
 ---@field chapter string
 ---@field color string
 ---@field style string
@@ -757,6 +758,7 @@ function GrimmoryAPI:getAnnotations(book_id)
             created_at = fromISO8601(raw_annotation.createdAt),
             cfi = tostring(raw_annotation.cfi),
             text = tostring(raw_annotation.text),
+            note = tostring(raw_annotation.note),
             chapter = tostring(raw_annotation.chapterTitle),
             color = tostring(raw_annotation.color),
             style = tostring(raw_annotation.style),
