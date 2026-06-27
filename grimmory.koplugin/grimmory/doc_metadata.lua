@@ -6,14 +6,6 @@ local util = require("util")
 local GrimmoryLogger = require("grimmory/logger")
 local logger = GrimmoryLogger:new()
 
-local function is_path_open(ui, path)
-    if ui.document == nil or ui.document.file == nil then
-        return false
-    end
-
-    return ui.document.file == path
-end
-
 ---@class GrimmoryDocMetadata
 ---@field private props_cache any
 ---@field private ui any
@@ -31,32 +23,6 @@ function DocMetadata:init()
     self.props_cache = Cache:new({ slots = 1024 })
 end
 
-function DocMetadata:refreshUI()
-    if self.ui == nil then
-        logger:dbg("Cannot refresh UI")
-        return
-    end
-
-    if self.ui.document == nil or self.ui.document.file == nil then
-        logger:dbg("No file is open, cannot refresh")
-        return
-    end
-
-    local settings = self:getDocSettings(self.ui.document.file)
-
-    -- Refresh live doc_settings
-    self.ui.doc_settings.data = settings.data
-
-    if self.ui.annotation then
-        -- Refresh annotations for any open document
-        self.ui.annotation.annotations = settings:readSetting("annotations")
-        pcall(self.ui.annotation.updateAnnotations, self.ui.annotation, true, true)
-    end
-
-    -- Reload document so any changes apply
-    self.ui:reloadDocument()
-end
-
 function DocMetadata:purge(path)
     local settings = self:getDocSettings(path)
 
@@ -65,10 +31,20 @@ function DocMetadata:purge(path)
     end
 end
 
-function DocMetadata:getDocSettings(path)
-    local settings = DocSettings:open(path)
+function DocMetadata:getDocSettings(path, fresh)
+    if self.ui and self.ui.document ~= nil and self.ui.document.file ~= nil then
+        if self.ui.document.file == path and self.ui.doc_settings then
+            if fresh then
+                local settings = DocSettings:open(path)
 
-    return settings
+                self.ui.doc_settings.data = settings.data
+            end
+
+            return self.ui.doc_settings
+        end
+    end
+
+    return DocSettings:open(path)
 end
 
 function DocMetadata:getDocProps(path)
@@ -239,10 +215,6 @@ function DocMetadata:setProgress(path, percent, xpointer, page)
     end
 
     settings:flush()
-
-    if is_path_open(self.ui, path) then
-        self:refreshUI()
-    end
 end
 
 return DocMetadata

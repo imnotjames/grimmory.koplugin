@@ -316,6 +316,9 @@ function Grimmory:pullProgressForOpenBook()
 
     local book_path = self.ui.document.file
 
+    -- Tell everything to flush so we have data available for our sync
+    UIManager:broadcastEvent(Event:new("FlushSettings"))
+
     self.executor:background(
         function(run)
             local ok, latest_progress = run(
@@ -387,6 +390,28 @@ function Grimmory:onGrimmorySyncOpenBook(verbose)
     local book_path = self.ui.document.file
 
     return self:onGrimmorySync(verbose, book_path)
+end
+
+function Grimmory:refreshUI()
+   if self.ui == nil then
+        return
+    end
+
+    if self.ui.document == nil or self.ui.document.file == nil then
+        logger:dbg("No file is open, cannot refresh")
+        return
+    end
+
+    local settings = self.doc_metadata:getDocSettings(self.ui.document.file, true)
+
+    if self.ui.annotation then
+        -- Refresh annotations for any open document
+        self.ui.annotation.annotations = settings:readSetting("annotations")
+        pcall(self.ui.annotation.updateAnnotations, self.ui.annotation, true, true)
+    end
+
+    -- Reload document so any changes apply
+    self.ui:reloadDocument()
 end
 
 function Grimmory:onGrimmorySync(verbose, book_path, refresh_book)
@@ -559,7 +584,7 @@ function Grimmory:onGrimmorySync(verbose, book_path, refresh_book)
         ReadCollection.last_read_time = 0
         ReadCollection:_read()
 
-        self.doc_metadata:refreshUI()
+        self:refreshUI()
 
         if verbose then
             local message = {
