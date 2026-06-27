@@ -8,6 +8,7 @@ local logger = GrimmoryLogger:new()
 
 ---@class GrimmorySynchronize
 ---@field repository GrimmoryLocalRepository
+---@field reading_annotations GrimmoryReadingAnnotations
 ---@field reading_progress_manager ReadingProgressManager
 ---@field settings GrimmorySettings
 ---@field api GrimmoryAPI
@@ -160,6 +161,72 @@ function GrimmorySynchronize:pushBookSessions(book_id, callback)
             end
         end
     end
+end
+
+---@param book_path string
+---@param book_grimmory_id integer
+function GrimmorySynchronize:pushBookAnnotations(book_path, book_grimmory_id)
+    local local_annotations = self.reading_annotations:getAnnotations(book_path)
+
+    local modified_grimmory_annotations = self.doc_metadata:getModifiedGrimmoryAnnotations(book_path)
+
+    local is_modified_by_id = {}
+    for _, modified_id in ipairs(modified_grimmory_annotations) do
+        is_modified_by_id[tostring(modified_id)] = true
+
+        logger:dbg("Deleting annotation frim Grimmory:", book_path, "-", modified_id)
+        self.api:deleteAnnotation(modified_id)
+
+        -- Even if the delete fails - which it does today with a 5xx instead of 404 - we
+        -- should continue to remove the annotation and assume it's just gone.
+        --
+        -- Once this bug (grimmory-tools/grimmory#1858) is fixed we can add the check
+        -- back in for the `ok` of `deleteAnnotation` calls.
+        self.doc_metadata:removeModifiedGrimmoryAnnotation(book_path, modified_id)
+    end
+
+    for _, annotation in ipairs(local_annotations) do
+        if annotation.id ~= nil and is_modified_by_id[tostring(annotation.id)] then
+            annotation.id = nil
+        end
+
+        if annotation.id == nil then
+            -- This is a "new" annotation.
+            local create_ok, remote_annotation = self.api:createAnnotation(
+                book_grimmory_id,
+                annotation.cfi,
+                annotation.chapter,
+                annotation.text,
+                annotation.color,
+                annotation.style,
+                annotation.note
+            )
+
+            if create_ok then
+                logger:dbg("Created annotation for book:", book_path)
+            else
+                logger:err("Failed to push annotation", remote_annotation)
+            end
+        end
+    end
+end
+
+---@param book_path string
+---@param book_grimmory_id integer
+function GrimmorySynchronize:pullBookAnnotations(book_path, book_grimmory_id)
+    local annotations_ok, annotations = self.api:getAnnotations(book_grimmory_id)
+
+    if not annotations_ok or annotations == nil then
+        logger:err("Failed pulling annotations from Grimmory:", book_grimmory_id)
+        return
+    end
+
+    logger:dbg("Writing annotations to:", book_path)
+
+    self.reading_annotations:applyAnnotations(
+        book_path,
+        annotations
+    )
 end
 
 ---@param book_id integer
@@ -874,6 +941,15 @@ function GrimmorySynchronize:synchronizeBook(book_path, refresh_book, callback)
         else
             logger:warn("Unable to locate book in Grimmory:", book_path)
         end
+    end
+
+    -- Pull annotations from Grimmory
+    if grimmory_id then
+        logger:info("Pushing book annotations:", book_path)
+        self:pushBookAnnotations(book_path, grimmory_id)
+
+        logger:info("Pulling book annotations:", book_path)
+        self:pullBookAnnotations(book_path, grimmory_id)
     end
 
     -- First, tell Grimmory about all of our reading

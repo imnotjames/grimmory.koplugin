@@ -36,6 +36,7 @@ local logger = GrimmoryLogger:new()
 ---@field sync_download_directory string
 ---@field sync_reading_sessions boolean
 ---@field sync_reading_progress boolean
+---@field sync_annotations boolean
 ---@field sync_shelves_as_collections boolean
 ---@field sync_retain_empty_shelves boolean
 ---@field device_id string
@@ -62,6 +63,7 @@ local DEFAULTS = {
     sync_download_directory = "grimmory/",
     sync_reading_sessions = true,
     sync_reading_progress = true,
+    sync_annotations = true,
     sync_shelves_as_collections = true,
     sync_retain_empty_shelves = false,
     device_id = random.uuid(),
@@ -271,6 +273,19 @@ end
 
 function GrimmorySettings:toggleSyncReadingSessions()
     self.data.sync_reading_sessions = not self:getSyncReadingSessions()
+    self:write()
+end
+
+function GrimmorySettings:getSyncAnnotations()
+    if self.data.sync_annotations == nil then
+        return DEFAULTS.sync_annotations
+    end
+
+    return self.data.sync_annotations
+end
+
+function GrimmorySettings:toggleSyncAnnotations()
+    self.data.sync_annotations = not self:getSyncAnnotations()
     self:write()
 end
 

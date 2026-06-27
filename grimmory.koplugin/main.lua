@@ -27,6 +27,7 @@ local GithubAPI = require("grimmory/ota/github_api")
 local GrimmoryLogger = require("grimmory/logger")
 local GrimmoryReadingRecorder = require("grimmory/reading/recorder")
 local GrimmoryLocalRepository = require("grimmory/repository")
+local GrimmoryReadingAnnotations = require("grimmory/reading/annotations")
 local GrimmoryReadingProgressManager = require("grimmory/reading/progress_manager")
 
 
@@ -105,6 +106,8 @@ function Grimmory:init()
         settings = self.settings
     })
 
+    self.reading_annotations = GrimmoryReadingAnnotations:new(self.doc_metadata)
+
     self.reading_progress_manager = GrimmoryReadingProgressManager:new({
         ui = self.ui,
         api = self.api,
@@ -132,6 +135,7 @@ function Grimmory:init()
         api = self.api,
         doc_metadata = self.doc_metadata,
         reading_progress_manager = self.reading_progress_manager,
+        reading_annotations = self.reading_annotations,
     })
 
     self.executor = GrimmoryExecutor:new()
@@ -256,14 +260,26 @@ end
 function Grimmory:onAnnotationsModified(annotation_info)
     logger:dbg("Annotations modified", annotation_info)
 
-    -- annotation is at annotation_info[1]
+    local annotation = annotation_info[1]
 
+    local is_modified = false
     if annotation_info.index_modified == nil then
         self.reading_recorder:onAnnotationUpdated()
+        is_modified = true
     elseif annotation_info.index_modified < 0 then
         self.reading_recorder:onAnnotationRemoved()
+        is_modified = true
     else
         self.reading_recorder:onAnnotationAdded()
+    end
+
+    if is_modified and self.ui ~= nil and self.ui.document ~= nil and self.ui.document.file ~= nil then
+        if annotation.grimmory_id ~= nil then
+            self.doc_metadata:appendModifiedGrimmoryAnnotation(
+                self.ui.document.file,
+                annotation.grimmory_id
+            )
+        end
     end
 end
 
