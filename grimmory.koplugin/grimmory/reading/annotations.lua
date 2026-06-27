@@ -124,6 +124,10 @@ function GrimmoryReadingAnnotations:new(doc_metadata)
 end
 
 local function normalize_xpointer(xpointer)
+    if xpointer == nil then
+        return ""
+    end
+
     -- /p[1]/ -> /p/
     xpointer = xpointer:gsub("%[1%]", "")
 
@@ -170,6 +174,8 @@ local function merge_annotations(local_annotations, remote_annotations)
             for _, existing_annotation in ipairs(new_annotations) do
                 if (
                     existing_annotation.grimmory_id == nil and
+                    existing_annotation.pos0 ~= nil and
+                    existing_annotation.pos1 ~= nil and
                     is_same_xpointer(existing_annotation.pos0, annotation.pos0) and
                     is_same_xpointer(existing_annotation.pos1, annotation.pos1)
                 ) then
@@ -269,20 +275,24 @@ function GrimmoryReadingAnnotations:getAnnotations(book_path)
         book_path,
         function(cfi_resolver)
             for _, annotation in ipairs(annotations) do
-                ---@type GrimmoryAnnotation
-                local grimmory_annotation = {
-                    id = annotation.grimmory_id,
-                    book_id = -1,
-                    created_at = from_annotation_datetime(annotation.datetime),
-                    updated_at = from_annotation_datetime(annotation.datetime_updated),
-                    cfi = cfi_resolver:xpointerRangeToCFI(annotation.pos0, annotation.pos1),
-                    chapter = annotation.chapter,
-                    text = annotation.text,
-                    color = KOREADER_COLOR_MAP[annotation.color] or DEFAULT_GRIMMORY_COLOR,
-                    style = KOREADER_STYLE_MAP[annotation.drawer] or DEFAULT_GRIMMORY_STYLE,
-                }
+                -- Annotations without pos0 / pos1 are bookmarks
+                if annotation.pos0 ~= nil and annotation.pos1 ~= nil then
+                    ---@type GrimmoryAnnotation
+                    local grimmory_annotation = {
+                        id = annotation.grimmory_id,
+                        book_id = -1,
+                        created_at = from_annotation_datetime(annotation.datetime),
+                        updated_at = from_annotation_datetime(annotation.datetime_updated),
+                        cfi = cfi_resolver:xpointerRangeToCFI(annotation.pos0, annotation.pos1),
+                        chapter = annotation.chapter,
+                        text = annotation.text,
+                        note = annotation.note,
+                        color = KOREADER_COLOR_MAP[annotation.color] or DEFAULT_GRIMMORY_COLOR,
+                        style = KOREADER_STYLE_MAP[annotation.drawer] or DEFAULT_GRIMMORY_STYLE,
+                    }
 
-                table.insert(grimmory_annotations, grimmory_annotation)
+                    table.insert(grimmory_annotations, grimmory_annotation)
+                end
             end
         end
     )
