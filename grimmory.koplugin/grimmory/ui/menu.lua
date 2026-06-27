@@ -162,6 +162,17 @@ function GrimmoryMenu:getSyncOptionsMenu()
             separator = true,
         },
         {
+            text = _("Sync Annotations"),
+            checked_func = function()
+                return self.settings:getSyncAnnotations()
+            end,
+            callback = function()
+                self.settings:toggleSyncAnnotations()
+                UIManager:broadcastEvent(Event:new("GrimmorySettingsChanged"))
+            end,
+            separator = true,
+        },
+        {
             text = _("Sync Reading Progress"),
             checked_func = function()
                 return self.settings:getSyncReadingProgress()
