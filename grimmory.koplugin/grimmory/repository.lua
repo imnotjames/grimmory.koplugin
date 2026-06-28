@@ -29,10 +29,12 @@ local function with_database(database_path, callback, flags)
         flags = "ro"
     end
 
-    local database = SQ3.open(
-        database_path,
-        flags
-    )
+    local open_ok, database = pcall(SQ3.open, database_path, flags)
+
+    if not open_ok then
+        return false, database
+    end
+
     database:set_busy_timeout(1000)
 
     local ok, result = pcall(callback, database)
