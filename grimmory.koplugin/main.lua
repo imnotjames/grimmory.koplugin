@@ -113,6 +113,7 @@ function Grimmory:init()
         api = self.api,
         settings = self.settings,
         repository = self.repository,
+        reading_recorder = self.reading_recorder,
     })
 
     self.dialog_manager = GrimmoryDialogManager:new({
