@@ -600,8 +600,6 @@ function Grimmory:onGrimmorySync(verbose, book_path, refresh_book)
         ReadCollection.last_read_time = 0
         ReadCollection:_read()
 
-        self:refreshUI()
-
         if book_path ~= nil then
             logger:info("Invalidating cache for book:", book_path)
 
@@ -612,6 +610,8 @@ function Grimmory:onGrimmorySync(verbose, book_path, refresh_book)
                 self.ui.file_chooser:init()
             end
         end
+
+        self:refreshUI()
 
         if verbose then
             local message = {
