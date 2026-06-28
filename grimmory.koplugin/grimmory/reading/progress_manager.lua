@@ -42,6 +42,7 @@ end
 ---@field api GrimmoryAPI
 ---@field repository GrimmoryLocalRepository
 ---@field settings GrimmorySettings
+---@field reading_recorder ReadingRecorder
 ---@field private koreader_auth_id string | nil
 ---@field private koreader_auth_secret_md5 string | nil
 local ReadingProgressManager = {}
@@ -229,6 +230,8 @@ function ReadingProgressManager:applyProgress(progress)
     -- If book path is the currently open book, use the go to command
     -- DocMetadata -> "last_xpointer" to progress
     if self.ui.document and progress.book_path == self.ui.document.file then
+        self.reading_recorder:onSessionEnd()
+
         if self.ui.document.info.has_pages then
             if progress.end_page then
                 self.ui:handleEvent(Event:new("GotoPage", tonumber(progress.end_page)))
