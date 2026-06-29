@@ -73,7 +73,89 @@ function GrimmoryMenu:getAboutMenu()
     }
 end
 
-function GrimmoryMenu:getAutomaticSyncOptionsMenu()
+function GrimmoryMenu:getOpenBookAutomaticSyncOptionsMenu()
+    return {
+        {
+            text = _("On Open Document"),
+            checked_func = function()
+                return self.settings:getSyncOnCloseDocument()
+            end,
+            callback = function()
+                self.settings:toggleSyncOnCloseDocument()
+                UIManager:broadcastEvent(Event:new("GrimmorySettingsChanged"))
+            end,
+            keep_menu_open = true,
+        },
+        {
+            text = _("On Close Document"),
+            checked_func = function()
+                return self.settings:getSyncOnCloseDocument()
+            end,
+            callback = function()
+                self.settings:toggleSyncOnCloseDocument()
+                UIManager:broadcastEvent(Event:new("GrimmorySettingsChanged"))
+            end,
+            keep_menu_open = true,
+        },
+        {
+            text = _("On Annotation"),
+            checked_func = function()
+                return self.settings:getSyncOnPowerOff()
+            end,
+            callback = function()
+                self.settings:toggleSyncOnPowerOff()
+                UIManager:broadcastEvent(Event:new("GrimmorySettingsChanged"))
+            end,
+            keep_menu_open = true,
+        },
+        {
+            text = _("On Finish Book"),
+            checked_func = function()
+                return self.settings:getSyncOnPowerOff()
+            end,
+            callback = function()
+                self.settings:toggleSyncOnPowerOff()
+                UIManager:broadcastEvent(Event:new("GrimmorySettingsChanged"))
+            end,
+            keep_menu_open = true,
+            separator = true,
+        },
+        {
+            text = _("Periodically Sync"),
+            checked_func = function()
+                return self.settings:getSyncPeriodically()
+            end,
+            callback = function()
+                self.settings:toggleSyncPeriodically()
+                UIManager:broadcastEvent(Event:new("GrimmorySettingsChanged"))
+            end,
+            keep_menu_open = true,
+        },
+        {
+            text_func = function()
+                local frequency = self.settings:getSyncFrequency()
+                return T(_("Frequency: %1 pages"), frequency)
+            end,
+            callback = function()
+                self.dialog_manager:showSyncFrequencySettings()
+            end,
+            separator = true,
+        },
+        {
+            text = _("Enable WiFi"),
+            enabled = Device:hasWifiToggle(),
+            checked_func = function()
+                return self.settings:getSyncEnableWifi()
+            end,
+            callback = function()
+                self.settings:toggleSyncEnableWifi()
+                UIManager:broadcastEvent(Event:new("GrimmorySettingsChanged"))
+            end,
+        },
+    }
+end
+
+function GrimmoryMenu:getLibraryAutomaticSyncOptionsMenu()
     return {
         {
             text = _("On Close Document"),
@@ -98,7 +180,7 @@ function GrimmoryMenu:getAutomaticSyncOptionsMenu()
             keep_menu_open = true,
         },
         {
-            text = _("On Power Off"),
+            text = _("On Power On"),
             checked_func = function()
                 return self.settings:getSyncOnPowerOff()
             end,
@@ -144,8 +226,59 @@ function GrimmoryMenu:getAutomaticSyncOptionsMenu()
     }
 end
 
-function GrimmoryMenu:getSyncOptionsMenu()
+function GrimmoryMenu:getOpenBookSyncOptionsMenu()
     return {
+        {
+            text = _("Automatically Sync"),
+            sub_item_table = self:getOpenBookAutomaticSyncOptionsMenu(),
+            separator = true,
+        },
+        {
+            text = _("Sync Reading Sessions"),
+            checked_func = function()
+                return self.settings:getSyncReadingSessions()
+            end,
+            callback = function()
+                self.settings:toggleSyncReadingSessions()
+                UIManager:broadcastEvent(Event:new("GrimmorySettingsChanged"))
+            end,
+        },
+        {
+            text = _("Reading Session Thresholds"),
+            callback = function()
+                self.dialog_manager:showSessionThresholdSettings()
+            end,
+        },
+        {
+            text = _("Sync Reading Progress"),
+            checked_func = function()
+                return self.settings:getSyncShelves()
+            end,
+            callback = function()
+                self.settings:toggleSyncShelves()
+                UIManager:broadcastEvent(Event:new("GrimmorySettingsChanged"))
+            end,
+        },
+        {
+            text = _("Sync Annotations"),
+            checked_func = function()
+                return self.settings:getSyncShelves()
+            end,
+            callback = function()
+                self.settings:toggleSyncShelves()
+                UIManager:broadcastEvent(Event:new("GrimmorySettingsChanged"))
+            end,
+        },
+    }
+end
+
+function GrimmoryMenu:getLibrarySyncOptionsMenu()
+    return {
+        {
+            text = _("Automatically Sync"),
+            sub_item_table = self:getLibraryAutomaticSyncOptionsMenu(),
+            separator = true,
+        },
         {
             text = _("Sync Reading Sessions"),
             checked_func = function()
@@ -266,18 +399,12 @@ end
 function GrimmoryMenu:getTopMenu()
     local menu = {
         {
-            text = _("Connection Settings"),
-            callback = function()
-                self.dialog_manager:showConnectionSettings()
-            end,
+            text = _("Open Book Sync Configuration"),
+            sub_item_table = self:getOpenBookSyncOptionsMenu(),
         },
         {
-            text = _("Automatic Sync"),
-            sub_item_table = self:getAutomaticSyncOptionsMenu()
-        },
-        {
-            text = _("Sync Configuration"),
-            sub_item_table = self:getSyncOptionsMenu(),
+            text = _("Library Sync Configuration"),
+            sub_item_table = self:getLibrarySyncOptionsMenu(),
             separator = true,
         },
         {
@@ -293,6 +420,13 @@ function GrimmoryMenu:getTopMenu()
         {
             text = _("Download Configuration"),
             sub_item_table = self:getDownloadOptionsMenu(),
+            separator = true,
+        },
+        {
+            text = _("Connection Settings"),
+            callback = function()
+                self.dialog_manager:showConnectionSettings()
+            end,
             separator = true,
         },
         {
