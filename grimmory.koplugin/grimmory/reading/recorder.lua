@@ -1,4 +1,3 @@
-local GrimmoryCFIResolver = require("grimmory/cfi_resolver")
 local GrimmoryLogger = require("grimmory/logger")
 
 local logger = GrimmoryLogger:new()
@@ -9,7 +8,6 @@ local logger = GrimmoryLogger:new()
 ---@field last_page integer | nil
 ---@field session_book_path string | nil
 ---@field session_id integer | nil
----@field cfi_resolver GrimmoryCFIResolver | nil
 local ReadingRecorder = {}
 
 function ReadingRecorder:new(o)
@@ -64,31 +62,6 @@ function ReadingRecorder:getOpenBookXPointer()
     return self.ui.rolling:getLastProgress()
 end
 
-function ReadingRecorder:getOpenBookCFI()
-    if not self.ui or not self.ui.document or self.ui.document.info.has_pages then
-        return nil
-    end
-
-    local xpointer = self.ui.rolling:getLastProgress()
-
-    if xpointer == nil then
-        return nil
-    end
-
-    if self.cfi_resolver == nil or self.cfi_resolver.document ~= self.ui.document then
-        self.cfi_resolver = GrimmoryCFIResolver:new(self.ui.document)
-    end
-
-    local ok, cfi = pcall(self.cfi_resolver.xpointerToCFI, self.cfi_resolver, xpointer)
-
-    if not ok then
-        logger:err("Could not convert xpointer:", cfi)
-        return nil
-    end
-
-    return cfi
-end
-
 ---@return string | nil book_path current book path
 function ReadingRecorder:getOpenBookPath()
     if not self.ui or not self.ui.document then
@@ -104,9 +77,8 @@ function ReadingRecorder:emitSessionEvent(session_id, event_type)
     local current_page = self:getOpenBookCurrentPage()
     local total_pages = self:getOpenBookTotalPages()
     local xpointer = self:getOpenBookXPointer()
-    local cfi = self:getOpenBookCFI()
 
-    self.repository:insertBookEvent(session_id, event_type, current_page, total_pages, xpointer, cfi)
+    self.repository:insertBookEvent(session_id, event_type, current_page, total_pages, xpointer)
 end
 
 function ReadingRecorder:onSessionStart()
@@ -194,7 +166,6 @@ function ReadingRecorder:onSessionEnd()
     self.last_page = nil
     self.session_id = nil
     self.session_book_path = nil
-    self.cfi_resolver = nil
 end
 
 return ReadingRecorder
