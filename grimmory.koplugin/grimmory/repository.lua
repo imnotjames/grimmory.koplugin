@@ -3,20 +3,11 @@ local DataStorage = require("datastorage")
 local util = require("util")
 
 local GrimmoryLogger = require("grimmory/logger")
+local PluginMetadata = require("grimmory/plugin_metadata")
 
 local logger = GrimmoryLogger:new()
 
 local SESSION_COLLAPSE_THRESHOLD = 180.0
-
-local function get_plugin_path()
-    local source = debug.getinfo(1, "S").source
-    local path = source:match("@(.*)/")
-    if not path or not path:match("%.koplugin$") then
-        path = DataStorage:getDataDir() .. "/plugins/grimmory.koplugin"
-    end
-
-    return path
-end
 
 ---@generic T
 ---@param database_path string
@@ -96,7 +87,7 @@ end
 ---@field migrations_path string
 ---@field database_path string
 local GrimmoryLocalRepository = {
-    migrations_path = get_plugin_path() .. "/grimmory/migrations/",
+    migrations_path = PluginMetadata:getPluginPath() .. "/grimmory/migrations/",
     database_path =  DataStorage:getSettingsDir() .. "/grimmory.sqlite3",
 }
 
@@ -147,6 +138,7 @@ function GrimmoryLocalRepository:runMigrations()
 end
 
 function GrimmoryLocalRepository:init()
+    logger:dbg("Running migrations")
     self:runMigrations()
 end
 

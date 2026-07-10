@@ -20,6 +20,12 @@ package.preload["gettext"] = function()
     end
 end
 
+package.preload["pluginloader"] = function()
+    return {
+        _discover = function() return {} end
+    }
+end
+
 package.preload["datastorage"] = function()
     return {
 
